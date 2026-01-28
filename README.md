@@ -12,8 +12,9 @@ SAT solver for [cluesbysam.com](https://cluesbysam.com/) puzzles.
 
 ```bash
 opam init
-eval $(opam env)
+opam switch create clues-solver 4.14.2
 opam install dune z3 re ppx_deriving
+eval $(opam env --switch=clues-solver)
 
 dune build
 ```
