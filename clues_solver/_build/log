@@ -1,0 +1,16 @@
+# dune exec clues_solver -- example_puzzle.txt
+# OCAMLPARAM: unset
+# Shared cache: enabled-except-user-rules
+# Shared cache location: /home/janpaulpl/.cache/dune/db
+# Workspace root: /home/janpaulpl/Documents/code/cluesbysam-solver/clues_solver
+# Auto-detected concurrency: 16
+# Dune context:
+#  { name = "default"
+#  ; kind = "default"
+#  ; profile = Dev
+#  ; merlin = true
+#  ; fdo_target_exe = None
+#  ; build_dir = In_build_dir "default"
+#  ; instrument_with = []
+#  }
+$ /home/janpaulpl/.opam/clues-solver/bin/ocamlc.opt -config > /tmp/dune_461e2d_output

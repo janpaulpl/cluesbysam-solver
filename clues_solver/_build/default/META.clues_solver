@@ -1,0 +1,6 @@
+description = ""
+requires = "ppx_deriving.runtime re re.pcre z3"
+archive(byte) = "clues_solver.cma"
+archive(native) = "clues_solver.cmxa"
+plugin(byte) = "clues_solver.cma"
+plugin(native) = "clues_solver.cmxs"

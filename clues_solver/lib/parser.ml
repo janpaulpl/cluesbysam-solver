@@ -1,0 +1,315 @@
+(** Natural language clue parser *)
+
+open Types
+
+(** Helper to extract names from a clue *)
+let extract_names puzzle_names clue =
+  List.filter (fun name ->
+    let pattern = Re.Pcre.regexp ~flags:[`CASELESS] (Printf.sprintf "\\b%s\\b" (Re.Pcre.quote name)) in
+    Re.execp pattern clue
+  ) puzzle_names
+
+(** Parse a number word to int *)
+let parse_number_word s =
+  match String.lowercase_ascii s with
+  | "zero" | "no" -> Some 0
+  | "one" | "a" | "an" -> Some 1
+  | "two" -> Some 2
+  | "three" -> Some 3
+  | "four" -> Some 4
+  | "five" -> Some 5
+  | "six" -> Some 6
+  | "seven" -> Some 7
+  | "eight" -> Some 8
+  | s -> int_of_string_opt s
+
+(** Parse a row reference *)
+let parse_row s =
+  let s = String.lowercase_ascii (String.trim s) in
+  if String.length s >= 5 && String.sub s 0 3 = "row" then
+    match String.trim (String.sub s 3 (String.length s - 3)) with
+    | "1" -> Some R1 | "2" -> Some R2 | "3" -> Some R3 
+    | "4" -> Some R4 | "5" -> Some R5 | _ -> None
+  else None
+
+(** Parse a column reference *)  
+let parse_column s =
+  let s = String.lowercase_ascii (String.trim s) in
+  if String.length s >= 6 && String.sub s 0 6 = "column" then
+    match String.trim (String.sub s 6 (String.length s - 6)) |> String.uppercase_ascii with
+    | "A" -> Some A | "B" -> Some B | "C" -> Some C | "D" -> Some D | _ -> None
+  else if String.length s >= 3 && String.sub s 0 3 = "col" then
+    match String.trim (String.sub s 3 (String.length s - 3)) |> String.uppercase_ascii with
+    | "A" -> Some A | "B" -> Some B | "C" -> Some C | "D" -> Some D | _ -> None
+  else None
+
+(** Main clue parser - returns a list of constraints *)
+let parse_clue ~speaker ~clue ~all_names : constraint_expr list =
+  let clue_lower = String.lowercase_ascii clue in
+  let _mentioned_names = extract_names all_names clue in
+  
+  let constraints = ref [] in
+  let add c = constraints := c :: !constraints in
+  
+  (* Pattern: "X is innocent" or "X is criminal" *)
+  let is_pattern = Re.Pcre.regexp ~flags:[`CASELESS] 
+    "\\b(\\w+)\\s+is\\s+(innocent|criminal|guilty)\\b" in
+  (try
+    let groups = Re.all is_pattern clue in
+    List.iter (fun g ->
+      let name = Re.Group.get g 1 in
+      let status = String.lowercase_ascii (Re.Group.get g 2) in
+      if List.mem name all_names then
+        add (if status = "innocent" then IsInnocent name else IsCriminal name)
+    ) groups
+  with _ -> ());
+  
+  (* Pattern: "I am innocent/criminal" *)
+  if Re.execp (Re.Pcre.regexp ~flags:[`CASELESS] "\\bI\\s+am\\s+innocent\\b") clue then
+    add (IsInnocent speaker)
+  else if Re.execp (Re.Pcre.regexp ~flags:[`CASELESS] "\\bI\\s+am\\s+(criminal|guilty)\\b") clue then
+    add (IsCriminal speaker);
+  
+  (* Pattern: "All criminals in row/column X are connected" *)
+  let connected_row = Re.Pcre.regexp ~flags:[`CASELESS]
+    "all\\s+criminals\\s+in\\s+row\\s+(\\d)\\s+are\\s+connected" in
+  let connected_col = Re.Pcre.regexp ~flags:[`CASELESS]
+    "all\\s+criminals\\s+in\\s+column\\s+([A-D])\\s+are\\s+connected" in
+  (try
+    let g = Re.exec connected_row clue_lower in
+    let row = match Re.Group.get g 1 with
+      | "1" -> R1 | "2" -> R2 | "3" -> R3 | "4" -> R4 | "5" -> R5 | _ -> failwith ""
+    in
+    add (Connected (Row row, Criminals))
+  with _ -> ());
+  (try
+    let g = Re.exec connected_col clue_lower in
+    let col = match String.uppercase_ascii (Re.Group.get g 1) with
+      | "A" -> A | "B" -> B | "C" -> C | "D" -> D | _ -> failwith ""
+    in
+    add (Connected (Column col, Criminals))
+  with _ -> ());
+  
+  (* Pattern: "X is one of N innocents/criminals on the edges" *)
+  let one_of_edges = Re.Pcre.regexp ~flags:[`CASELESS]
+    "(\\w+)\\s+is\\s+one\\s+of\\s+(\\d+|one|two|three|four|five|six|seven|eight)\\s+(innocents?|criminals?)\\s+on\\s+the\\s+edges?" in
+  (try
+    let g = Re.exec one_of_edges clue in
+    let name = Re.Group.get g 1 in
+    let count_str = Re.Group.get g 2 in
+    let target_str = String.lowercase_ascii (Re.Group.get g 3) in
+    if List.mem name all_names then begin
+      let count = Option.value ~default:0 (parse_number_word count_str) in
+      let target = if String.sub target_str 0 1 = "i" then Innocents else Criminals in
+      add (Count (Edges, target, Eq count));
+      add (if target = Innocents then IsInnocent name else IsCriminal name)
+    end
+  with _ -> ());
+  
+  (* Pattern: "There are N criminals/innocents in row/column X" *)
+  let count_region = Re.Pcre.regexp ~flags:[`CASELESS]
+    "there\\s+(?:are|is)\\s+(\\d+|one|two|three|four|five|zero|no)\\s+(criminals?|innocents?)\\s+in\\s+(row\\s+\\d|column\\s+[A-D])" in
+  (try
+    let g = Re.exec count_region clue_lower in
+    let count_str = Re.Group.get g 1 in
+    let target_str = Re.Group.get g 2 in
+    let region_str = Re.Group.get g 3 in
+    let count = Option.value ~default:0 (parse_number_word count_str) in
+    let target = if String.sub target_str 0 1 = "i" then Innocents else Criminals in
+    let region = 
+      match parse_row region_str with
+      | Some r -> Row r
+      | None -> 
+        match parse_column region_str with
+        | Some c -> Column c
+        | None -> failwith "unknown region"
+    in
+    add (Count (region, target, Eq count))
+  with _ -> ());
+  
+  (* Pattern: "X has N criminal/innocent neighbors" *)
+  let neighbor_count = Re.Pcre.regexp ~flags:[`CASELESS]
+    "(\\w+)\\s+has?\\s+(\\d+|one|two|three|four|five|six|seven|eight|zero|no|an?\\s+even|an?\\s+odd)\\s+(criminal|innocent)\\s+neighbors?" in
+  (try
+    let groups = Re.all neighbor_count clue in
+    List.iter (fun g ->
+      let name = Re.Group.get g 1 in
+      let count_str = String.lowercase_ascii (Re.Group.get g 2) in
+      let target_str = Re.Group.get g 3 in
+      if List.mem name all_names then begin
+        let target = if target_str = "innocent" then InnocentNeighbors else CriminalNeighbors in
+        let comparison = 
+          if String.sub count_str 0 3 = "eve" || String.sub count_str (String.length count_str - 4) 4 = "even" then Even
+          else if String.sub count_str 0 3 = "odd" || String.sub count_str (String.length count_str - 3) 3 = "odd" then Odd
+          else Eq (Option.value ~default:0 (parse_number_word count_str))
+        in
+        add (PersonCount (name, target, comparison))
+      end
+    ) groups
+  with _ -> ());
+  
+  (* Pattern: "I have N criminal/innocent neighbors" *)
+  let i_have_neighbors = Re.Pcre.regexp ~flags:[`CASELESS]
+    "I\\s+have\\s+(\\d+|one|two|three|four|five|six|seven|eight|zero|no|an?\\s+even|an?\\s+odd)\\s+(criminal|innocent)\\s+neighbors?" in
+  (try
+    let g = Re.exec i_have_neighbors clue in
+    let count_str = String.lowercase_ascii (Re.Group.get g 1) in
+    let target_str = Re.Group.get g 2 in
+    let target = if target_str = "innocent" then InnocentNeighbors else CriminalNeighbors in
+    let comparison = 
+      if String.sub count_str 0 3 = "eve" || (String.length count_str >= 4 && String.sub count_str (String.length count_str - 4) 4 = "even") then Even
+      else if String.sub count_str 0 3 = "odd" || (String.length count_str >= 3 && String.sub count_str (String.length count_str - 3) 3 = "odd") then Odd
+      else Eq (Option.value ~default:0 (parse_number_word count_str))
+    in
+    add (PersonCount (speaker, target, comparison))
+  with _ -> ());
+  
+  (* Pattern: "X and Y are both innocent/criminal" *)
+  let both_same = Re.Pcre.regexp ~flags:[`CASELESS]
+    "(\\w+)\\s+and\\s+(\\w+)\\s+are\\s+both\\s+(innocent|criminal)" in
+  (try
+    let g = Re.exec both_same clue in
+    let name1 = Re.Group.get g 1 in
+    let name2 = Re.Group.get g 2 in
+    let status = Re.Group.get g 3 in
+    if List.mem name1 all_names && List.mem name2 all_names then begin
+      if status = "innocent" then begin
+        add (IsInnocent name1);
+        add (IsInnocent name2)
+      end else begin
+        add (IsCriminal name1);
+        add (IsCriminal name2)
+      end
+    end
+  with _ -> ());
+  
+  (* Pattern: "X has the same number of criminal neighbors as Y" *)
+  let same_neighbors = Re.Pcre.regexp ~flags:[`CASELESS]
+    "(\\w+)\\s+has?\\s+the\\s+same\\s+number\\s+of\\s+(criminal|innocent)\\s+neighbors\\s+as\\s+(\\w+)" in
+  (try
+    let g = Re.exec same_neighbors clue in
+    let name1 = Re.Group.get g 1 in
+    let target_str = Re.Group.get g 2 in
+    let name2 = Re.Group.get g 3 in
+    if List.mem name1 all_names && List.mem name2 all_names then begin
+      let target = if target_str = "innocent" then InnocentNeighbors else CriminalNeighbors in
+      add (SameAs (name1, target, name2))
+    end
+  with _ -> ());
+  
+  (* Pattern: "X has the most criminal/innocent neighbors" *)
+  let the_most = Re.Pcre.regexp ~flags:[`CASELESS]
+    "(\\w+)\\s+has?\\s+(?:the\\s+)?most\\s+(criminal|innocent)\\s+neighbors?" in
+  (try
+    let g = Re.exec the_most clue in
+    let name = Re.Group.get g 1 in
+    let target_str = Re.Group.get g 2 in
+    if List.mem name all_names then begin
+      let target = if target_str = "innocent" then InnocentNeighbors else CriminalNeighbors in
+      add (TheMost (name, target))
+    end
+  with _ -> ());
+  
+  (* Pattern: "Exactly N of X, Y, Z are innocent/criminal" *)
+  let exactly_n = Re.Pcre.regexp ~flags:[`CASELESS]
+    "exactly\\s+(\\d+|one|two|three)\\s+of\\s+(.+?)\\s+(?:are|is)\\s+(innocent|criminal)" in
+  (try
+    let g = Re.exec exactly_n clue in
+    let count_str = Re.Group.get g 1 in
+    let names_str = Re.Group.get g 2 in
+    let status_str = Re.Group.get g 3 in
+    let count = Option.value ~default:0 (parse_number_word count_str) in
+    let target = if status_str = "innocent" then Innocents else Criminals in
+    (* Extract names from the list *)
+    let names_in_list = extract_names all_names names_str in
+    if List.length names_in_list > 0 then
+      add (ExactlyN (names_in_list, target, count))
+  with _ -> ());
+  
+  (* Pattern: "If X is innocent/criminal, then Y is innocent/criminal" *)
+  let if_then = Re.Pcre.regexp ~flags:[`CASELESS]
+    "if\\s+(\\w+)\\s+is\\s+(innocent|criminal),?\\s+then\\s+(\\w+)\\s+is\\s+(innocent|criminal)" in
+  (try
+    let g = Re.exec if_then clue in
+    let name1 = Re.Group.get g 1 in
+    let status1 = Re.Group.get g 2 in
+    let name2 = Re.Group.get g 3 in
+    let status2 = Re.Group.get g 4 in
+    if List.mem name1 all_names && List.mem name2 all_names then begin
+      let antecedent = if status1 = "innocent" then IsInnocent name1 else IsCriminal name1 in
+      let consequent = if status2 = "innocent" then IsInnocent name2 else IsCriminal name2 in
+      add (Implies (antecedent, consequent))
+    end
+  with _ -> ());
+  
+  (* Pattern: "More criminals/innocents in row X than row Y" *)
+  let more_than_rows = Re.Pcre.regexp ~flags:[`CASELESS]
+    "more\\s+(criminals?|innocents?)\\s+in\\s+row\\s+(\\d)\\s+than\\s+(?:in\\s+)?row\\s+(\\d)" in
+  (try
+    let g = Re.exec more_than_rows clue_lower in
+    let target_str = Re.Group.get g 1 in
+    let row1_str = Re.Group.get g 2 in
+    let row2_str = Re.Group.get g 3 in
+    let target = if String.sub target_str 0 1 = "i" then Innocents else Criminals in
+    let row1 = match row1_str with "1" -> R1 | "2" -> R2 | "3" -> R3 | "4" -> R4 | "5" -> R5 | _ -> failwith "" in
+    let row2 = match row2_str with "1" -> R1 | "2" -> R2 | "3" -> R3 | "4" -> R4 | "5" -> R5 | _ -> failwith "" in
+    add (MoreThan (Row row1, target, Row row2, target))
+  with _ -> ());
+  
+  (* Pattern: "X and Y share an odd/even number of innocent/criminal neighbors" *)
+  let share_neighbors = Re.Pcre.regexp ~flags:[`CASELESS]
+    "(\\w+)\\s+and\\s+(\\w+)\\s+share\\s+(?:an?\\s+)?(odd|even)\\s+number\\s+of\\s+(innocent|criminal)\\s+neighbors?" in
+  (try
+    let g = Re.exec share_neighbors clue in
+    let name1 = Re.Group.get g 1 in
+    let name2 = Re.Group.get g 2 in
+    let parity = Re.Group.get g 3 in
+    let target_str = Re.Group.get g 4 in
+    if List.mem name1 all_names && List.mem name2 all_names then begin
+      let target = if target_str = "innocent" then Innocents else Criminals in
+      let comparison = if parity = "odd" then Odd else Even in
+      add (ShareNeighbors (name1, name2, target, comparison))
+    end
+  with _ -> ());
+  
+  (* Pattern: "There are N criminals/innocents in total" or "N criminals/innocents total" *)
+  let total_count = Re.Pcre.regexp ~flags:[`CASELESS]
+    "(?:there\\s+are\\s+)?(\\d+|one|two|three|four|five|six|seven|eight|nine|ten)\\s+(criminals?|innocents?)\\s+(?:in\\s+)?total" in
+  (try
+    let g = Re.exec total_count clue_lower in
+    let count_str = Re.Group.get g 1 in
+    let target_str = Re.Group.get g 2 in
+    let count = Option.value ~default:0 (parse_number_word count_str) in
+    let target = if String.sub target_str 0 1 = "i" then Innocents else Criminals in
+    add (Count (Entire_grid, target, Eq count))
+  with _ -> ());
+  
+  (* Pattern: "between X and Y" with some property *)
+  let between_innocents = Re.Pcre.regexp ~flags:[`CASELESS]
+    "between\\s+(\\w+)\\s+and\\s+(\\w+).*?(\\d+|one|two|three|zero|no)\\s+(criminals?|innocents?)" in
+  (try
+    let g = Re.exec between_innocents clue in
+    let name1 = Re.Group.get g 1 in
+    let name2 = Re.Group.get g 2 in
+    let count_str = Re.Group.get g 3 in
+    let target_str = Re.Group.get g 4 in
+    if List.mem name1 all_names && List.mem name2 all_names then begin
+      let count = Option.value ~default:0 (parse_number_word count_str) in
+      let target = if String.sub target_str 0 1 = "i" then Innocents else Criminals in
+      add (Count (Between (name1, name2), target, Eq count))
+    end
+  with _ -> ());
+  
+  (* If no constraints were parsed, add an Unparsed marker *)
+  if !constraints = [] then
+    [Unparsed clue]
+  else
+    !constraints
+
+(** Test if a clue was fully parsed *)
+let is_fully_parsed constraints =
+  not (List.exists (function Unparsed _ -> true | _ -> false) constraints)
+
+(** Get unparsed parts of a clue *)
+let get_unparsed constraints =
+  List.filter_map (function Unparsed s -> Some s | _ -> None) constraints

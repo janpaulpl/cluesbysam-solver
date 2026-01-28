@@ -1,0 +1,77 @@
+(lang dune 3.21)
+(name clues_solver)
+(sections (lib .) (libexec .) (bin ../../bin))
+(files
+ (lib
+  (META
+   cli.ml
+   clues_solver.a
+   clues_solver.cma
+   clues_solver.cmi
+   clues_solver.cmt
+   clues_solver.cmx
+   clues_solver.cmxa
+   clues_solver.ml
+   clues_solver__Cli.cmi
+   clues_solver__Cli.cmt
+   clues_solver__Cli.cmx
+   clues_solver__Parser.cmi
+   clues_solver__Parser.cmt
+   clues_solver__Parser.cmx
+   clues_solver__Puzzle.cmi
+   clues_solver__Puzzle.cmt
+   clues_solver__Puzzle.cmx
+   clues_solver__Solver.cmi
+   clues_solver__Solver.cmt
+   clues_solver__Solver.cmx
+   clues_solver__Types.cmi
+   clues_solver__Types.cmt
+   clues_solver__Types.cmx
+   dune-package
+   opam
+   parser.ml
+   puzzle.ml
+   solver.ml
+   types.ml))
+ (libexec (clues_solver.cmxs))
+ (bin (clues_solver)))
+(library
+ (name clues_solver)
+ (kind normal)
+ (archives (byte clues_solver.cma) (native clues_solver.cmxa))
+ (plugins (byte clues_solver.cma) (native clues_solver.cmxs))
+ (native_archives clues_solver.a)
+ (requires z3 re re.pcre ppx_deriving.runtime)
+ (main_module_name Clues_solver)
+ (modes byte native)
+ (modules
+  (wrapped
+   (group
+    (alias
+     (obj_name clues_solver)
+     (visibility public)
+     (kind alias)
+     (source (path Clues_solver) (impl (path clues_solver.ml-gen))))
+    (name Clues_solver)
+    (modules
+     (module
+      (obj_name clues_solver__Cli)
+      (visibility public)
+      (source (path Cli) (impl (path cli.ml))))
+     (module
+      (obj_name clues_solver__Parser)
+      (visibility public)
+      (source (path Parser) (impl (path parser.ml))))
+     (module
+      (obj_name clues_solver__Puzzle)
+      (visibility public)
+      (source (path Puzzle) (impl (path puzzle.ml))))
+     (module
+      (obj_name clues_solver__Solver)
+      (visibility public)
+      (source (path Solver) (impl (path solver.ml))))
+     (module
+      (obj_name clues_solver__Types)
+      (visibility public)
+      (source (path Types) (impl (path types.ml))))))
+   (wrapped true))))

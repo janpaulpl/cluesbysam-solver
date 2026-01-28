@@ -1,0 +1,38 @@
+lib: [
+  "_build/install/default/lib/clues_solver/META"
+  "_build/install/default/lib/clues_solver/cli.ml"
+  "_build/install/default/lib/clues_solver/clues_solver.a"
+  "_build/install/default/lib/clues_solver/clues_solver.cma"
+  "_build/install/default/lib/clues_solver/clues_solver.cmi"
+  "_build/install/default/lib/clues_solver/clues_solver.cmt"
+  "_build/install/default/lib/clues_solver/clues_solver.cmx"
+  "_build/install/default/lib/clues_solver/clues_solver.cmxa"
+  "_build/install/default/lib/clues_solver/clues_solver.ml"
+  "_build/install/default/lib/clues_solver/clues_solver__Cli.cmi"
+  "_build/install/default/lib/clues_solver/clues_solver__Cli.cmt"
+  "_build/install/default/lib/clues_solver/clues_solver__Cli.cmx"
+  "_build/install/default/lib/clues_solver/clues_solver__Parser.cmi"
+  "_build/install/default/lib/clues_solver/clues_solver__Parser.cmt"
+  "_build/install/default/lib/clues_solver/clues_solver__Parser.cmx"
+  "_build/install/default/lib/clues_solver/clues_solver__Puzzle.cmi"
+  "_build/install/default/lib/clues_solver/clues_solver__Puzzle.cmt"
+  "_build/install/default/lib/clues_solver/clues_solver__Puzzle.cmx"
+  "_build/install/default/lib/clues_solver/clues_solver__Solver.cmi"
+  "_build/install/default/lib/clues_solver/clues_solver__Solver.cmt"
+  "_build/install/default/lib/clues_solver/clues_solver__Solver.cmx"
+  "_build/install/default/lib/clues_solver/clues_solver__Types.cmi"
+  "_build/install/default/lib/clues_solver/clues_solver__Types.cmt"
+  "_build/install/default/lib/clues_solver/clues_solver__Types.cmx"
+  "_build/install/default/lib/clues_solver/dune-package"
+  "_build/install/default/lib/clues_solver/opam"
+  "_build/install/default/lib/clues_solver/parser.ml"
+  "_build/install/default/lib/clues_solver/puzzle.ml"
+  "_build/install/default/lib/clues_solver/solver.ml"
+  "_build/install/default/lib/clues_solver/types.ml"
+]
+libexec: [
+  "_build/install/default/lib/clues_solver/clues_solver.cmxs"
+]
+bin: [
+  "_build/install/default/bin/clues_solver"
+]

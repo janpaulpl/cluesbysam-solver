@@ -1,0 +1,11 @@
+(lang dune 3.0)
+(name clues_solver)
+
+(package
+ (name clues_solver)
+ (synopsis "SAT-based solver for Clues by Sam puzzles")
+ (depends
+  (ocaml (>= 4.14))
+  z3
+  re
+  ppx_deriving))
