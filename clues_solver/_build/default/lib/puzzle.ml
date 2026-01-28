@@ -62,6 +62,38 @@ let people_in_region puzzle region =
          List.exists (equal_position p.pos) between_positions
        ) puzzle.people
      | _ -> [])
+  | Below name ->
+    (match find_by_name puzzle name with
+     | None -> []
+     | Some person ->
+       let below_positions = Position.below person.pos in
+       List.filter (fun p ->
+         List.exists (equal_position p.pos) below_positions
+       ) puzzle.people)
+  | Above name ->
+    (match find_by_name puzzle name with
+     | None -> []
+     | Some person ->
+       let above_positions = Position.above person.pos in
+       List.filter (fun p ->
+         List.exists (equal_position p.pos) above_positions
+       ) puzzle.people)
+  | LeftOf name ->
+    (match find_by_name puzzle name with
+     | None -> []
+     | Some person ->
+       let left_positions = Position.left_of person.pos in
+       List.filter (fun p ->
+         List.exists (equal_position p.pos) left_positions
+       ) puzzle.people)
+  | RightOf name ->
+    (match find_by_name puzzle name with
+     | None -> []
+     | Some person ->
+       let right_positions = Position.right_of person.pos in
+       List.filter (fun p ->
+         List.exists (equal_position p.pos) right_positions
+       ) puzzle.people)
   | Custom names ->
     List.filter (fun p ->
       List.exists (fun n -> 

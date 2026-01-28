@@ -1,4 +1,4 @@
-(** Interactive command-line interface for the puzzle solver *)
+(** Interactive CLI for the puzzle solver *)
 
 open Types
 

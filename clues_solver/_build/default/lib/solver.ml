@@ -94,8 +94,12 @@ module Z3Solver = struct
     if List.length people <= 1 then
       Z3.Boolean.mk_true state.ctx
     else begin
-      (* For each pair of criminals, all people between must also be criminal *)
       let constraints = ref [] in
+      (* Per game rules: "All always means there's at least one" *)
+      let at_least_one = Z3.Boolean.mk_or state.ctx 
+        (List.map (fun p -> is_criminal state p.name) people) in
+      constraints := at_least_one :: !constraints;
+      (* For each pair of criminals, all people between must also be criminal *)
       for i = 0 to List.length people - 1 do
         for j = i + 2 to List.length people - 1 do
           let pi = List.nth people i in
@@ -116,8 +120,7 @@ module Z3Solver = struct
           constraints := Z3.Boolean.mk_implies state.ctx both_criminal all_between_criminal :: !constraints
         done
       done;
-      if !constraints = [] then Z3.Boolean.mk_true state.ctx
-      else Z3.Boolean.mk_and state.ctx !constraints
+      Z3.Boolean.mk_and state.ctx !constraints
     end
   
   (** Check if criminals in a column are connected *)
@@ -130,6 +133,12 @@ module Z3Solver = struct
       Z3.Boolean.mk_true state.ctx
     else begin
       let constraints = ref [] in
+      (* Per game rules: "All always means there's at least one" *)
+      (* So "All criminals in column X are connected" implies at least one criminal exists *)
+      let at_least_one = Z3.Boolean.mk_or state.ctx 
+        (List.map (fun p -> is_criminal state p.name) people) in
+      constraints := at_least_one :: !constraints;
+      (* Connectivity: for each pair of criminals, everyone between must be criminal *)
       for i = 0 to List.length people - 1 do
         for j = i + 2 to List.length people - 1 do
           let pi = List.nth people i in
@@ -149,8 +158,7 @@ module Z3Solver = struct
           constraints := Z3.Boolean.mk_implies state.ctx both_criminal all_between_criminal :: !constraints
         done
       done;
-      if !constraints = [] then Z3.Boolean.mk_true state.ctx
-      else Z3.Boolean.mk_and state.ctx !constraints
+      Z3.Boolean.mk_and state.ctx !constraints
     end
   
   (** Encode a constraint expression into Z3 *)

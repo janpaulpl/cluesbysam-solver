@@ -73,8 +73,9 @@ let parse_clue ~speaker ~clue ~all_names : constraint_expr list =
   (* Pattern: "All criminals in row/column X are connected" *)
   let connected_row = Re.Pcre.regexp ~flags:[`CASELESS]
     "all\\s+criminals\\s+in\\s+row\\s+(\\d)\\s+are\\s+connected" in
+  (* Use [A-Da-d] to match both uppercase and lowercase column letters *)
   let connected_col = Re.Pcre.regexp ~flags:[`CASELESS]
-    "all\\s+criminals\\s+in\\s+column\\s+([A-D])\\s+are\\s+connected" in
+    "all\\s+criminals\\s+in\\s+column\\s+([A-Da-d])\\s+are\\s+connected" in
   (try
     let g = Re.exec connected_row clue_lower in
     let row = match Re.Group.get g 1 with
@@ -108,7 +109,7 @@ let parse_clue ~speaker ~clue ~all_names : constraint_expr list =
   
   (* Pattern: "There are N criminals/innocents in row/column X" *)
   let count_region = Re.Pcre.regexp ~flags:[`CASELESS]
-    "there\\s+(?:are|is)\\s+(\\d+|one|two|three|four|five|zero|no)\\s+(criminals?|innocents?)\\s+in\\s+(row\\s+\\d|column\\s+[A-D])" in
+    "there\\s+(?:are|is)\\s+(\\d+|one|two|three|four|five|zero|no)\\s+(criminals?|innocents?)\\s+in\\s+(row\\s+\\d|column\\s+[A-Da-d])" in
   (try
     let g = Re.exec count_region clue_lower in
     let count_str = Re.Group.get g 1 in
@@ -125,6 +126,50 @@ let parse_clue ~speaker ~clue ~all_names : constraint_expr list =
         | None -> failwith "unknown region"
     in
     add (Count (region, target, Eq count))
+  with _ -> ());
+  
+  (* Pattern: "odd/even number of innocents/criminals below/above/to the left of/to the right of X" *)
+  let relative_count = Re.Pcre.regexp ~flags:[`CASELESS]
+    "(?:there(?:'s|\\s+is|\\s+are)\\s+)?(?:an?\\s+)?(odd|even)\\s+number\\s+of\\s+(innocents?|criminals?)\\s+(below|above|to\\s+the\\s+left\\s+of|to\\s+the\\s+right\\s+of)\\s+(\\w+)" in
+  (try
+    let g = Re.exec relative_count clue in
+    let parity = String.lowercase_ascii (Re.Group.get g 1) in
+    let target_str = String.lowercase_ascii (Re.Group.get g 2) in
+    let direction = String.lowercase_ascii (Re.Group.get g 3) in
+    let name = Re.Group.get g 4 in
+    if List.mem name all_names then begin
+      let target = if String.sub target_str 0 1 = "i" then Innocents else Criminals in
+      let comparison = if parity = "odd" then Odd else Even in
+      let region = 
+        if String.sub direction 0 5 = "below" then Below name
+        else if String.sub direction 0 5 = "above" then Above name
+        else if String.length direction > 10 && String.sub direction 0 11 = "to the left" then LeftOf name
+        else RightOf name
+      in
+      add (Count (region, target, comparison))
+    end
+  with _ -> ());
+  
+  (* Pattern: "N innocents/criminals below/above X" *)
+  let simple_relative_count = Re.Pcre.regexp ~flags:[`CASELESS]
+    "(?:there(?:'s|\\s+is|\\s+are)\\s+)?(\\d+|one|two|three|four|five|zero|no)\\s+(innocents?|criminals?)\\s+(below|above|to\\s+the\\s+left\\s+of|to\\s+the\\s+right\\s+of)\\s+(\\w+)" in
+  (try
+    let g = Re.exec simple_relative_count clue in
+    let count_str = Re.Group.get g 1 in
+    let target_str = String.lowercase_ascii (Re.Group.get g 2) in
+    let direction = String.lowercase_ascii (Re.Group.get g 3) in
+    let name = Re.Group.get g 4 in
+    if List.mem name all_names then begin
+      let count = Option.value ~default:0 (parse_number_word count_str) in
+      let target = if String.sub target_str 0 1 = "i" then Innocents else Criminals in
+      let region = 
+        if String.sub direction 0 5 = "below" then Below name
+        else if String.sub direction 0 5 = "above" then Above name
+        else if String.length direction > 10 && String.sub direction 0 11 = "to the left" then LeftOf name
+        else RightOf name
+      in
+      add (Count (region, target, Eq count))
+    end
   with _ -> ());
   
   (* Pattern: "X has N criminal/innocent neighbors" *)

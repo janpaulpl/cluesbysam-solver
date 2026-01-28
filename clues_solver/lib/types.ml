@@ -1,4 +1,4 @@
-(** Types for the Clues by Sam puzzle solver *)
+(** Core types for the Clues by Sam puzzle solver *)
 
 (** Column identifiers A-D *)
 type column = A | B | C | D
@@ -46,6 +46,10 @@ type region =
   | Neighbors of string        (* Neighbors of person by name *)
   | CommonNeighbors of string * string
   | Between of string * string (* People between two named persons *)
+  | Below of string            (* People below a named person (same column, higher row number) *)
+  | Above of string            (* People above a named person (same column, lower row number) *)
+  | LeftOf of string           (* People to the left of a named person (same row) *)
+  | RightOf of string          (* People to the right of a named person (same row) *)
   | Custom of string list      (* Explicit list of names *)
 [@@deriving show]
 
@@ -113,7 +117,7 @@ type constraint_expr =
   | InSameColumn of string * string
   
   (* Complex constraints *)
-  | Unparsed of string  (* Fallback for clues we couldn't parse *)
+  | Unparsed of string
 [@@deriving show]
 
 (** Module for position operations *)
@@ -224,4 +228,36 @@ module Position = struct
       ) [0; 1; 2; 3]
     else
       [] (* Not in same row or column - no "between" defined *)
+  
+  (** Get positions below a position (same column, higher row number) *)
+  let below pos =
+    let ri = row_to_int pos.row in
+    List.filter_map (fun r ->
+      if r > ri then Some { col = pos.col; row = int_to_row r }
+      else None
+    ) [0; 1; 2; 3; 4]
+  
+  (** Get positions above a position (same column, lower row number) *)
+  let above pos =
+    let ri = row_to_int pos.row in
+    List.filter_map (fun r ->
+      if r < ri then Some { col = pos.col; row = int_to_row r }
+      else None
+    ) [0; 1; 2; 3; 4]
+  
+  (** Get positions to the left of a position (same row, lower column number) *)
+  let left_of pos =
+    let ci = col_to_int pos.col in
+    List.filter_map (fun c ->
+      if c < ci then Some { col = int_to_col c; row = pos.row }
+      else None
+    ) [0; 1; 2; 3]
+  
+  (** Get positions to the right of a position (same row, higher column number) *)
+  let right_of pos =
+    let ci = col_to_int pos.col in
+    List.filter_map (fun c ->
+      if c > ci then Some { col = int_to_col c; row = pos.row }
+      else None
+    ) [0; 1; 2; 3]
 end
