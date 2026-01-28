@@ -1,0 +1,50 @@
+[How to play Clues by Sam](https://cluesbysam.com/)
+Your goal is to figure out who is criminal and who is innocent.
+Based on what you know, tap on a suspect to choose if they are innocent or criminal. They might reveal a new clue.
+You cannot guess! Just like in real life, you can't convict someone based on a 50/50 hunch. There is always a logical next choice, even when you think there isn't!
+
+And that's it. Good luck!
+ 
+Clarifying details
+Everyone is either a criminal or innocent.
+Professions don't make some innocent or criminal, unless a hint suggest so. A cop is as criminal as an accountant until proven otherwise.
+Everyone speaks the truth, even the criminals.
+Neighbors always include diagonal neighbors. One person can have up to 8 neighbors.
+In between (or sometimes just between) means the persons between the two, not including the two.
+Connected means a chain of orthogonal adjacency. For example "all criminals in row 1 are connected" means there are no innocents between any two criminals in that row. A group of one person is considered connected (like in graph theory), so it doesn't mean there are at least two.
+Rows go sideways and are numbered 1,2,3,4,5. Columns go up and down and lettered A,B,C,D.
+Above/below always means somewhere in the same column.
+To the left/right always means somewhere in the same row (from your point of view, not the person's).
+Directly to the left/right/above/below always means the neighbor to the left/right/above/below.
+All always means there's at least one. It doesn't necessarily mean there's more than one.
+Both means there's exactly 2.
+Common neighbors means those who are neighbors of both persons. It does not include the persons themselves.
+Share means "have in common". For example, "Share an odd number of innocent neighbors" means "have an odd number of common innocent neighbors".
+In total always means the sum of all in the group(s). Two criminal cops and cooks in total means there might be 1 cop and 1 cook, or 0 cops and 2 cooks, or 2 cops and 0 cooks.
+Corner means the four corners.
+Edge means the 14 persons "surrounding" the board, including corners.
+... the most always means uniquely the most. If John has the most criminal neighbors, no one can have as many criminal neighbors as John.
+An even number means numbers divisible by two: 0, 2, 4, 6... and an odd number means everything else: 1, 3, 5, 7...
+More doesn't mean there needs to be any in the lesser group. For example "There are more innocents in row A than row B" doesn't require there to be any innocents in row B.
+Numbers are exact unless stated otherwise. "There are 2 criminal coders" means there's exactly 2 criminal coders.
+"If A then B" does NOT mean the same as "If and only if A then B". Therefore it does NOT mean "If not A then not B". But please note that, due to how logic works, it DOES mean "If not B then not A". (It's called the contraposition.)
+You never need to guess. In fact, the game only allows you to make logical choices.
+Tips
+People are in alphabetical order by name.
+Tap the top right corner of each card to add a color tag. This is useful for keeping track of deductions or trying out hypotheticals. How will you use it?
+Tap on revealed clues to dim them if you think it's no longer useful to you. This is optional, but can help you keep track of which clues are still relevant.
+Referenced names and professions are highlighted. If you rapidly tap the clue referencing a name or profession, you'll see them bounce, making it easier to detect them.
+For clarifying details about the clue terminology in the puzzle, press the Inspect button and then a revealed card.
+"Is this a logic error?"
+Since the game prevents you from guessing, it also prevents you from making mistakes. But if the game prevents you from making a choice, how do you know if the mistake was yours or mine? Did you just find an error in the puzzle?
+
+The game's logic system makes sure the logic is sound, and there haven't been any errors with the current system yet (unless you count that one mech disguised as a clown on Oct 28, 2025). It's quite likely that you might have pressed the wrong button or misread a clue. Please double check your logic first.
+
+If you really think you found an error in the logic, I suggest you post about it on reddit, for example on r/CluesBySamHelp, so others can help confirm it.
+
+Stuck?
+Don't feel bad, it's a difficult game! Try asking for help for example on Bluesky or r/CluesBySamHelp. You can also try r/puzzles, but only for archived puzzles or yesterday's puzzle, since they don't allow questions about daily puzzles. Press the "Share scenario" button below to copy a link to your current situation. Others can continue from where you are when opening the game through the link. Even on another day.
+
+Share scenario
+
+There is also a hint button available below the grid. It will first reveal the clues you should be looking at, and the second press will reveal the persons you can identify.
