@@ -340,6 +340,38 @@ let parse_clue ~speaker ~clue ~all_names : constraint_expr list =
     end
   with _ -> ());
   
+  (* Pattern: "Only/Exactly N of the M innocents/criminals in [region] is/are X's neighbor(s)" *)
+  (* e.g. "Only 1 of the 2 innocents in column B is Laura's neighbor" *)
+  (* Also handles: "on the edges", "on the corners", "in row N" *)
+  let region_neighbor_count = Re.Pcre.regexp ~flags:[`CASELESS]
+    "(?:only|exactly)\\s+(\\d+|one|two|three|four|five|six|seven|eight)\\s+of\\s+(?:the\\s+)?(\\d+|one|two|three|four|five|six|seven|eight)\\s+(innocents?|criminals?)\\s+(?:in|on)\\s+(?:the\\s+)?(row\\s+\\d|column\\s+[A-Da-d]|edges?|corners?)\\s+(?:is|are)\\s+(\\w+)'s\\s+neighbors?" in
+  (try
+    let g = Re.exec region_neighbor_count clue in
+    let neighbor_count_str = Re.Group.get g 1 in
+    let total_count_str = Re.Group.get g 2 in
+    let target_str = String.lowercase_ascii (Re.Group.get g 3) in
+    let region_str = String.lowercase_ascii (Re.Group.get g 4) in
+    let person_name = Re.Group.get g 5 in
+    if List.mem person_name all_names then begin
+      let neighbor_count = Option.value ~default:0 (parse_number_word neighbor_count_str) in
+      let total_count = Option.value ~default:0 (parse_number_word total_count_str) in
+      let target = if String.sub target_str 0 1 = "i" then Innocents else Criminals in
+      let region = 
+        if String.sub region_str 0 3 = "row" then
+          match parse_row region_str with Some r -> Row r | None -> failwith "bad row"
+        else if String.sub region_str 0 3 = "col" then
+          match parse_column region_str with Some c -> Column c | None -> failwith "bad col"
+        else if String.sub region_str 0 4 = "edge" then Edges
+        else if String.sub region_str 0 4 = "corn" then Corners
+        else failwith "unknown region"
+      in
+      (* M innocents/criminals in region *)
+      add (Count (region, target, Eq total_count));
+      (* N of them are person's neighbors *)
+      add (RegionNeighborCount (region, target, person_name, Eq neighbor_count))
+    end
+  with _ -> ());
+  
   (* Pattern: "There are N criminals/innocents in total" or "N criminals/innocents total" *)
   let total_count = Re.Pcre.regexp ~flags:[`CASELESS]
     "(?:there\\s+are\\s+)?(\\d+|one|two|three|four|five|six|seven|eight|nine|ten)\\s+(criminals?|innocents?)\\s+(?:in\\s+)?total" in

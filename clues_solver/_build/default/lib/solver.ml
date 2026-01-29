@@ -257,6 +257,17 @@ module Z3Solver = struct
       let count = count_in_people state target common_neighbors in
       make_comparison state count comparison
     
+    | RegionNeighborCount (region, target, person_name, comparison) ->
+      (* Count of [target] in [region] who are also neighbors of [person] *)
+      let region_people = people_in_region state region in
+      let neighbor_people = people_in_region state (Neighbors person_name) in
+      (* Find intersection: people in both region and neighbors *)
+      let intersection = List.filter (fun p ->
+        List.exists (fun n -> n.name = p.name) neighbor_people
+      ) region_people in
+      let count = count_in_people state target intersection in
+      make_comparison state count comparison
+    
     | SomeoneInRegion (region, target) ->
       let people = people_in_region state region in
       let vars = List.map (fun p ->

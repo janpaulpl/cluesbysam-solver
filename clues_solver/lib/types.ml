@@ -105,6 +105,9 @@ type constraint_expr =
   (* Share constraints - common neighbors *)
   | ShareNeighbors of string * string * count_target * comparison
   
+  (* Count of [target] in [region] who are neighbors of [person] *)
+  | RegionNeighborCount of region * count_target * string * comparison
+  
   (* Location-based *)
   | SomeoneInRegion of region * count_target  (* At least one criminal/innocent in region *)
   
