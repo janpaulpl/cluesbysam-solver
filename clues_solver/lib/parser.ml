@@ -369,18 +369,34 @@ let parse_clue ~speaker ~clue ~all_names : constraint_expr list =
     end
   with _ -> ());
   
-  (* Pattern: "More criminals/innocents in row X than row Y" *)
-  let more_than_rows = Re.Pcre.regexp ~flags:[`CASELESS]
-    "more\\s+(criminals?|innocents?)\\s+in\\s+row\\s+(\\d)\\s+than\\s+(?:in\\s+)?row\\s+(\\d)" in
+  (* Pattern: "[There are] more criminals/innocents in [region] than [region]" *)
+  (* Handles rows, columns, edges, corners *)
+  let more_than_regions = Re.Pcre.regexp ~flags:[`CASELESS]
+    "(?:there\\s+are\\s+)?more\\s+(criminals?|innocents?)\\s+in\\s+(row\\s+\\d|column\\s+[A-Da-d]|the\\s+edges?|the\\s+corners?)\\s+than\\s+(?:in\\s+)?(row\\s+\\d|column\\s+[A-Da-d]|the\\s+edges?|the\\s+corners?)" in
+  let parse_region_string s =
+    let s = String.lowercase_ascii (String.trim s) in
+    if String.length s >= 3 && String.sub s 0 3 = "row" then
+      match parse_row s with Some r -> Some (Row r) | None -> None
+    else if String.length s >= 3 && String.sub s 0 3 = "col" then
+      match parse_column s with Some c -> Some (Column c) | None -> None
+    else if String.length s >= 6 && String.sub s 0 6 = "column" then
+      match parse_column s with Some c -> Some (Column c) | None -> None
+    else if String.length s >= 4 && (String.sub s 0 4 = "edge" || 
+            (String.length s >= 9 && String.sub s 0 9 = "the edge")) then Some Edges
+    else if String.length s >= 4 && (String.sub s 0 4 = "corn" ||
+            (String.length s >= 10 && String.sub s 0 10 = "the corner")) then Some Corners
+    else None
+  in
   (try
-    let g = Re.exec more_than_rows clue_lower in
+    let g = Re.exec more_than_regions clue_lower in
     let target_str = Re.Group.get g 1 in
-    let row1_str = Re.Group.get g 2 in
-    let row2_str = Re.Group.get g 3 in
+    let region1_str = Re.Group.get g 2 in
+    let region2_str = Re.Group.get g 3 in
     let target = if String.sub target_str 0 1 = "i" then Innocents else Criminals in
-    let row1 = match row1_str with "1" -> R1 | "2" -> R2 | "3" -> R3 | "4" -> R4 | "5" -> R5 | _ -> failwith "" in
-    let row2 = match row2_str with "1" -> R1 | "2" -> R2 | "3" -> R3 | "4" -> R4 | "5" -> R5 | _ -> failwith "" in
-    add (MoreThan (Row row1, target, Row row2, target))
+    match parse_region_string region1_str, parse_region_string region2_str with
+    | Some region1, Some region2 ->
+      add (MoreThan (region1, target, region2, target))
+    | _ -> ()
   with _ -> ());
   
   (* Pattern: "X and Y share an odd/even number of innocent/criminal neighbors" *)

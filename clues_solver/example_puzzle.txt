@@ -1,10 +1,10 @@
 A1, Bonnie, NO DESCRIPTION YET
 A2, Gary, Exactly 2 of Peter's 3 innocent neighbors also neighbor Oscar
 A3, Kyle, There's an odd number of innocents below Hazel
-A4, Oscar, NO DESCRIPTION YET
+A4, Oscar, Who could it be, that mysterious innocent living on the edge?
 A5, Uma, All criminals in column A are connected
-B1, Debra, NO DESCRIPTION YET
-B2, Hazel, NO DESCRIPTION YET
+B1, Debra, Only one more innocent in the edges?
+B2, Hazel, Terry is one of Saga's 6 criminal neighbors
 B3, Laura, NO DESCRIPTION YET
 B4, Peter, Only 1 of the 2 innocents in column B is Laura's neighbor
 B5, Wally, NO DESCRIPTION YET
