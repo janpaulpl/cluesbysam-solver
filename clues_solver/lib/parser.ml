@@ -399,6 +399,40 @@ let parse_clue ~speaker ~clue ~all_names : constraint_expr list =
     | _ -> ()
   with _ -> ());
   
+  (* Pattern: "Row/Column X has more innocents/criminals than any other row/column" *)
+  (* e.g. "Row 5 has more innocents than any other row" *)
+  let more_than_any_other = Re.Pcre.regexp ~flags:[`CASELESS]
+    "(row\\s+\\d|column\\s+[A-Da-d])\\s+has\\s+more\\s+(innocents?|criminals?)\\s+than\\s+any\\s+other\\s+(row|column)" in
+  (try
+    let g = Re.exec more_than_any_other clue_lower in
+    let region_str = Re.Group.get g 1 in
+    let target_str = Re.Group.get g 2 in
+    let region_type = Re.Group.get g 3 in
+    let target = if String.sub target_str 0 1 = "i" then Innocents else Criminals in
+    let region = 
+      if String.length region_str >= 3 && String.sub region_str 0 3 = "row" then
+        match parse_row region_str with Some r -> Row r | None -> failwith "bad row"
+      else
+        match parse_column region_str with Some c -> Column c | None -> failwith "bad col"
+    in
+    (* Generate MoreThan constraints for each other row/column *)
+    if region_type = "row" then begin
+      let all_rows = [R1; R2; R3; R4; R5] in
+      let this_row = match region with Row r -> r | _ -> failwith "expected row" in
+      List.iter (fun other_row ->
+        if not (equal_row this_row other_row) then
+          add (MoreThan (region, target, Row other_row, target))
+      ) all_rows
+    end else begin
+      let all_cols = [A; B; C; D] in
+      let this_col = match region with Column c -> c | _ -> failwith "expected column" in
+      List.iter (fun other_col ->
+        if not (equal_column this_col other_col) then
+          add (MoreThan (region, target, Column other_col, target))
+      ) all_cols
+    end
+  with _ -> ());
+  
   (* Pattern: "X and Y share an odd/even number of innocent/criminal neighbors" *)
   let share_neighbors = Re.Pcre.regexp ~flags:[`CASELESS]
     "(\\w+)\\s+and\\s+(\\w+)\\s+share\\s+(?:an?\\s+)?(odd|even)\\s+number\\s+of\\s+(innocent|criminal)\\s+neighbors?" in
@@ -472,6 +506,7 @@ let parse_clue ~speaker ~clue ~all_names : constraint_expr list =
   
   (* Pattern: "Exactly/Only N innocents/criminals in [region] is/are neighboring X" *)
   (* e.g. "Exactly 1 innocent in row 5 is neighboring Saga" *)
+  (* Simpler version without specifying total count in region *)
   let simple_region_neighbor = Re.Pcre.regexp ~flags:[`CASELESS]
     "(?:only|exactly)\\s+(\\d+|one|two|three|four|five|six|seven|eight|zero|no)\\s+(innocents?|criminals?)\\s+(?:in|on)\\s+(?:the\\s+)?(row\\s+\\d|column\\s+[A-Da-d]|edges?|corners?)\\s+(?:is|are)\\s+(?:neighboring|neighbour(?:ing)?|neighbors?\\s+of|neighbours?\\s+of)\\s+(\\w+)" in
   (try
