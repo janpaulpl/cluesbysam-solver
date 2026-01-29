@@ -275,6 +275,23 @@ module Z3Solver = struct
       let count = count_in_people state target intersection in
       make_comparison state count comparison
     
+    | CountPeopleWithNeighbors (region, target, neighbor_comparison, total_comparison) ->
+      (* Count how many people in [region] have [neighbor_comparison] [target] neighbors *)
+      let region_people = people_in_region state region in
+      (* For each person, create: if (neighbor_count satisfies comparison) then 1 else 0 *)
+      let person_satisfies = List.map (fun p ->
+        let neighbor_count = count_neighbors state p.name target in
+        let satisfies = make_comparison state neighbor_count neighbor_comparison in
+        Z3.Boolean.mk_ite state.ctx satisfies
+          (Z3.Arithmetic.Integer.mk_numeral_i state.ctx 1)
+          (Z3.Arithmetic.Integer.mk_numeral_i state.ctx 0)
+      ) region_people in
+      let total = 
+        if person_satisfies = [] then Z3.Arithmetic.Integer.mk_numeral_i state.ctx 0
+        else Z3.Arithmetic.mk_add state.ctx person_satisfies
+      in
+      make_comparison state total total_comparison
+    
     | SomeoneInRegion (region, target) ->
       let people = people_in_region state region in
       let vars = List.map (fun p ->

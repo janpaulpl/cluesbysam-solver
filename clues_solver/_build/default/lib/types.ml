@@ -109,6 +109,10 @@ type constraint_expr =
   (* Count of [target] in [region] who are neighbors of [person] *)
   | RegionNeighborCount of region * count_target * string * comparison
   
+  (* Count of people in [region] who have [comparison1] [target] neighbors, total count is [comparison2] *)
+  (* e.g., "Only one person in column C has exactly 5 criminal neighbors" *)
+  | CountPeopleWithNeighbors of region * count_target * comparison * comparison
+  
   (* Location-based *)
   | SomeoneInRegion of region * count_target  (* At least one criminal/innocent in region *)
   

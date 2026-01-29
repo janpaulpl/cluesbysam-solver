@@ -326,6 +326,56 @@ let parse_clue ~speaker ~clue ~all_names : constraint_expr list =
     end
   with _ -> ());
   
+  (* Pattern: "Only/Exactly N person(s) in [region] has/have exactly M criminal/innocent neighbors" *)
+  (* e.g. "Only one person in column C has exactly 5 criminal neighbors" *)
+  let people_with_neighbors = Re.Pcre.regexp ~flags:[`CASELESS]
+    "(?:only|exactly)\\s+(\\d+|one|two|three|four|five|zero|no)\\s+(?:person|people)\\s+(?:in|on)\\s+(?:the\\s+)?(row\\s+\\d|column\\s+[A-Da-d]|edges?|corners?)\\s+(?:has|have)\\s+(?:exactly\\s+)?(\\d+|one|two|three|four|five|six|seven|eight)\\s+(criminal|innocent)\\s+neighbors?" in
+  (try
+    let g = Re.exec people_with_neighbors clue_lower in
+    let people_count_str = Re.Group.get g 1 in
+    let region_str = Re.Group.get g 2 in
+    let neighbor_count_str = Re.Group.get g 3 in
+    let target_str = Re.Group.get g 4 in
+    let people_count = Option.value ~default:0 (parse_number_word people_count_str) in
+    let neighbor_count = Option.value ~default:0 (parse_number_word neighbor_count_str) in
+    let target = if target_str = "innocent" then InnocentNeighbors else CriminalNeighbors in
+    let region = 
+      if String.length region_str >= 3 && String.sub region_str 0 3 = "row" then
+        match parse_row region_str with Some r -> Row r | None -> failwith "bad row"
+      else if String.length region_str >= 3 && String.sub region_str 0 3 = "col" then
+        match parse_column region_str with Some c -> Column c | None -> failwith "bad col"
+      else if String.length region_str >= 4 && String.sub region_str 0 4 = "edge" then Edges
+      else if String.length region_str >= 4 && String.sub region_str 0 4 = "corn" then Corners
+      else failwith "unknown region"
+    in
+    add (CountPeopleWithNeighbors (region, target, Eq neighbor_count, Eq people_count))
+  with _ -> ());
+  
+  (* Pattern: "No one in [region] has more than N criminal/innocent neighbors" *)
+  (* e.g. "No one in column D has more than 2 innocent neighbors" *)
+  (* This means: count of people with > N neighbors = 0 *)
+  let no_one_more_than = Re.Pcre.regexp ~flags:[`CASELESS]
+    "no\\s+one\\s+(?:in|on)\\s+(?:the\\s+)?(row\\s+\\d|column\\s+[A-Da-d]|edges?|corners?)\\s+has\\s+more\\s+than\\s+(\\d+|one|two|three|four|five|six|seven|eight)\\s+(criminal|innocent)\\s+neighbors?" in
+  (try
+    let g = Re.exec no_one_more_than clue_lower in
+    let region_str = Re.Group.get g 1 in
+    let count_str = Re.Group.get g 2 in
+    let target_str = Re.Group.get g 3 in
+    let count = Option.value ~default:0 (parse_number_word count_str) in
+    let target = if target_str = "innocent" then InnocentNeighbors else CriminalNeighbors in
+    let region = 
+      if String.length region_str >= 3 && String.sub region_str 0 3 = "row" then
+        match parse_row region_str with Some r -> Row r | None -> failwith "bad row"
+      else if String.length region_str >= 3 && String.sub region_str 0 3 = "col" then
+        match parse_column region_str with Some c -> Column c | None -> failwith "bad col"
+      else if String.length region_str >= 4 && String.sub region_str 0 4 = "edge" then Edges
+      else if String.length region_str >= 4 && String.sub region_str 0 4 = "corn" then Corners
+      else failwith "unknown region"
+    in
+    (* "No one has more than N" = "0 people have > N" *)
+    add (CountPeopleWithNeighbors (region, target, Gt count, Eq 0))
+  with _ -> ());
+  
   (* Pattern: "X and Y are both innocent/criminal" *)
   let both_same = Re.Pcre.regexp ~flags:[`CASELESS]
     "(\\w+)\\s+and\\s+(\\w+)\\s+are\\s+both\\s+(innocent|criminal)" in
@@ -552,6 +602,37 @@ let parse_clue ~speaker ~clue ~all_names : constraint_expr list =
       let comparison = if parity = "odd" then Odd else Even in
       add (ShareNeighbors (name1, name2, target, comparison))
     end
+  with _ -> ());
+  
+  (* Pattern: "N of X's neighbors on/in [region] are innocent/criminal" *)
+  (* e.g. "2 of Cheryl's neighbors on the edges are innocent" *)
+  let neighbors_in_region = Re.Pcre.regexp ~flags:[`CASELESS]
+    "(\\d+|one|two|three|four|five|six|seven|eight|zero|no)\\s+of\\s+(\\w+)'s\\s+neighbors?\\s+(?:in|on)\\s+(?:the\\s+)?(row\\s+\\d|column\\s+[A-Da-d]|edges?|corners?)\\s+(?:is|are)\\s+(innocent|criminal)" in
+  (try
+    let g = Re.exec neighbors_in_region clue_lower in
+    let count_str = Re.Group.get g 1 in
+    let name = Re.Group.get g 2 in
+    let region_str = Re.Group.get g 3 in
+    let target_str = Re.Group.get g 4 in
+    (* Need to find the actual name with proper capitalization *)
+    let actual_name = List.find_opt (fun n -> 
+      String.lowercase_ascii n = name
+    ) all_names in
+    match actual_name with
+    | Some person_name ->
+      let count = Option.value ~default:0 (parse_number_word count_str) in
+      let target = if target_str = "innocent" then Innocents else Criminals in
+      let region = 
+        if String.length region_str >= 3 && String.sub region_str 0 3 = "row" then
+          match parse_row region_str with Some r -> Row r | None -> failwith "bad row"
+        else if String.length region_str >= 3 && String.sub region_str 0 3 = "col" then
+          match parse_column region_str with Some c -> Column c | None -> failwith "bad col"
+        else if String.length region_str >= 4 && String.sub region_str 0 4 = "edge" then Edges
+        else if String.length region_str >= 4 && String.sub region_str 0 4 = "corn" then Corners
+        else failwith "unknown region"
+      in
+      add (RegionNeighborCount (region, target, person_name, Eq count))
+    | None -> ()
   with _ -> ());
   
   (* Pattern: "Exactly N of X's M innocent/criminal neighbors also neighbor Y" *)
