@@ -254,9 +254,9 @@ let parse_clue ~speaker ~clue ~all_names : constraint_expr list =
     end
   with _ -> ());
   
-  (* Pattern: "X has N criminal/innocent neighbors" *)
+  (* Pattern: "X has [only/exactly] N criminal/innocent neighbors" *)
   let neighbor_count = Re.Pcre.regexp ~flags:[`CASELESS]
-    "(\\w+)\\s+has?\\s+(\\d+|one|two|three|four|five|six|seven|eight|zero|no|an?\\s+even|an?\\s+odd)\\s+(criminal|innocent)\\s+neighbors?" in
+    "(\\w+)\\s+has?\\s+(?:only\\s+|exactly\\s+)?(\\d+|one|two|three|four|five|six|seven|eight|zero|no|an?\\s+even|an?\\s+odd)\\s+(criminal|innocent)\\s+neighbors?" in
   (try
     let groups = Re.all neighbor_count clue in
     List.iter (fun g ->
@@ -265,9 +265,12 @@ let parse_clue ~speaker ~clue ~all_names : constraint_expr list =
       let target_str = Re.Group.get g 3 in
       if List.mem name all_names then begin
         let target = if target_str = "innocent" then InnocentNeighbors else CriminalNeighbors in
+        let len = String.length count_str in
         let comparison = 
-          if String.sub count_str 0 3 = "eve" || String.sub count_str (String.length count_str - 4) 4 = "even" then Even
-          else if String.sub count_str 0 3 = "odd" || String.sub count_str (String.length count_str - 3) 3 = "odd" then Odd
+          if (len >= 3 && String.sub count_str 0 3 = "eve") || 
+             (len >= 4 && String.sub count_str (len - 4) 4 = "even") then Even
+          else if (len >= 3 && String.sub count_str 0 3 = "odd") || 
+                  (len >= 3 && String.sub count_str (len - 3) 3 = "odd") then Odd
           else Eq (Option.value ~default:0 (parse_number_word count_str))
         in
         add (PersonCount (name, target, comparison))
@@ -275,17 +278,20 @@ let parse_clue ~speaker ~clue ~all_names : constraint_expr list =
     ) groups
   with _ -> ());
   
-  (* Pattern: "I have N criminal/innocent neighbors" *)
+  (* Pattern: "I have [only/exactly] N criminal/innocent neighbors" *)
   let i_have_neighbors = Re.Pcre.regexp ~flags:[`CASELESS]
-    "I\\s+have\\s+(\\d+|one|two|three|four|five|six|seven|eight|zero|no|an?\\s+even|an?\\s+odd)\\s+(criminal|innocent)\\s+neighbors?" in
+    "I\\s+have\\s+(?:only\\s+|exactly\\s+)?(\\d+|one|two|three|four|five|six|seven|eight|zero|no|an?\\s+even|an?\\s+odd)\\s+(criminal|innocent)\\s+neighbors?" in
   (try
     let g = Re.exec i_have_neighbors clue in
     let count_str = String.lowercase_ascii (Re.Group.get g 1) in
     let target_str = Re.Group.get g 2 in
     let target = if target_str = "innocent" then InnocentNeighbors else CriminalNeighbors in
+    let len = String.length count_str in
     let comparison = 
-      if String.sub count_str 0 3 = "eve" || (String.length count_str >= 4 && String.sub count_str (String.length count_str - 4) 4 = "even") then Even
-      else if String.sub count_str 0 3 = "odd" || (String.length count_str >= 3 && String.sub count_str (String.length count_str - 3) 3 = "odd") then Odd
+      if (len >= 3 && String.sub count_str 0 3 = "eve") || 
+         (len >= 4 && String.sub count_str (len - 4) 4 = "even") then Even
+      else if (len >= 3 && String.sub count_str 0 3 = "odd") || 
+              (len >= 3 && String.sub count_str (len - 3) 3 = "odd") then Odd
       else Eq (Option.value ~default:0 (parse_number_word count_str))
     in
     add (PersonCount (speaker, target, comparison))
@@ -487,14 +493,14 @@ let parse_clue ~speaker ~clue ~all_names : constraint_expr list =
     if List.mem person_name all_names then begin
       let neighbor_count = Option.value ~default:0 (parse_number_word neighbor_count_str) in
       let total_count = Option.value ~default:0 (parse_number_word total_count_str) in
-      let target = if String.sub target_str 0 1 = "i" then Innocents else Criminals in
+      let target = if String.length target_str >= 1 && String.sub target_str 0 1 = "i" then Innocents else Criminals in
       let region = 
-        if String.sub region_str 0 3 = "row" then
+        if String.length region_str >= 3 && String.sub region_str 0 3 = "row" then
           match parse_row region_str with Some r -> Row r | None -> failwith "bad row"
-        else if String.sub region_str 0 3 = "col" then
+        else if String.length region_str >= 3 && String.sub region_str 0 3 = "col" then
           match parse_column region_str with Some c -> Column c | None -> failwith "bad col"
-        else if String.sub region_str 0 4 = "edge" then Edges
-        else if String.sub region_str 0 4 = "corn" then Corners
+        else if String.length region_str >= 4 && String.sub region_str 0 4 = "edge" then Edges
+        else if String.length region_str >= 4 && String.sub region_str 0 4 = "corn" then Corners
         else failwith "unknown region"
       in
       (* M innocents/criminals in region *)
