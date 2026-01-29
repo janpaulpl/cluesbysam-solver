@@ -1,11 +1,11 @@
-A1, Alex, NO DESCRIPTION YET
-A2, Hope, NO DESCRIPTION YET
-A3, Laura, NO DESCRIPTION YET
+A1, Alex, You won't believe this but... My spatual was stolen again.
+A2, Hope, There's an odd number of criminals to the right of Uma
+A3, Laura, Row 5 is the only row with exactly one criminal
 A4, Paul, Exactly 2 of Jerry's 4 innocent neighbors also neighbor Olive
 A5, Uma, NO DESCRIPTION YET
 B1, Bruce, NO DESCRIPTION YET
 B2, Isaac, Donna is one of 2 criminals in row 1
-B3, Megan, NO DESCRIPTION YET
+B3, Megan, There's an odd number of criminals neighboring Saga
 B4, Ruby, NO DESCRIPTION YET
 B5, Wally, NO DESCRIPTION YET
 C1, Cheryl, NO DESCRIPTION YET
@@ -13,8 +13,8 @@ C2, Jerry, NO DESCRIPTION YET
 C3, Nick, There is only one innocent to the right of Laura
 C4, Saga, NO DESCRIPTION YET
 C5, Xavi, NO DESCRIPTION YET
-D1, Donna, NO DESCRIPTION YET
+D1, Donna, Exactly 3 of the 8 innocents on the edges are Isaac's neighbors
 D2, Katie, There's an odd number of innocents to the right of Alex
-D3, Olive, NO DESCRIPTION YET
+D3, Olive, There's an equal number of innocents in rows 1 and 3
 D4, Thor, NO DESCRIPTION YET
 D5, Ziad, NO DESCRIPTION YET

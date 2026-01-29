@@ -26,17 +26,30 @@ let parse_number_word s =
 (** Parse a row reference *)
 let parse_row s =
   let s = String.lowercase_ascii (String.trim s) in
-  if String.length s >= 5 && String.sub s 0 3 = "row" then
-    match String.trim (String.sub s 3 (String.length s - 3)) with
-    | "1" -> Some R1 | "2" -> Some R2 | "3" -> Some R3 
-    | "4" -> Some R4 | "5" -> Some R5 | _ -> None
-  else None
+  (* Handle both "row X" and "rows X" *)
+  let rest = 
+    if String.length s >= 5 && String.sub s 0 4 = "rows" then
+      String.trim (String.sub s 4 (String.length s - 4))
+    else if String.length s >= 4 && String.sub s 0 3 = "row" then
+      String.trim (String.sub s 3 (String.length s - 3))
+    else ""
+  in
+  match rest with
+  | "1" -> Some R1 | "2" -> Some R2 | "3" -> Some R3 
+  | "4" -> Some R4 | "5" -> Some R5 | _ -> None
 
 (** Parse a column reference *)  
 let parse_column s =
   let s = String.lowercase_ascii (String.trim s) in
-  if String.length s >= 6 && String.sub s 0 6 = "column" then
+  (* Handle both "column X" and "columns X" *)
+  if String.length s >= 7 && String.sub s 0 7 = "columns" then
+    match String.trim (String.sub s 7 (String.length s - 7)) |> String.uppercase_ascii with
+    | "A" -> Some A | "B" -> Some B | "C" -> Some C | "D" -> Some D | _ -> None
+  else if String.length s >= 6 && String.sub s 0 6 = "column" then
     match String.trim (String.sub s 6 (String.length s - 6)) |> String.uppercase_ascii with
+    | "A" -> Some A | "B" -> Some B | "C" -> Some C | "D" -> Some D | _ -> None
+  else if String.length s >= 4 && String.sub s 0 4 = "cols" then
+    match String.trim (String.sub s 4 (String.length s - 4)) |> String.uppercase_ascii with
     | "A" -> Some A | "B" -> Some B | "C" -> Some C | "D" -> Some D | _ -> None
   else if String.length s >= 3 && String.sub s 0 3 = "col" then
     match String.trim (String.sub s 3 (String.length s - 3)) |> String.uppercase_ascii with
@@ -483,6 +496,44 @@ let parse_clue ~speaker ~clue ~all_names : constraint_expr list =
       List.iter (fun other_col ->
         if not (equal_column this_col other_col) then
           add (MoreThan (region, target, Column other_col, target))
+      ) all_cols
+    end
+  with _ -> ());
+  
+  (* Pattern: "Row/Column X is the only row/column with exactly N criminals/innocents" *)
+  (* e.g. "Row 5 is the only row with exactly one criminal" *)
+  let only_with_exactly = Re.Pcre.regexp ~flags:[`CASELESS]
+    "(row\\s+\\d|column\\s+[A-Da-d])\\s+is\\s+the\\s+only\\s+(row|column)\\s+with\\s+(?:exactly\\s+)?(\\d+|one|two|three|four|five|zero|no)\\s+(criminals?|innocents?)" in
+  (try
+    let g = Re.exec only_with_exactly clue_lower in
+    let region_str = Re.Group.get g 1 in
+    let region_type = Re.Group.get g 2 in
+    let count_str = Re.Group.get g 3 in
+    let target_str = Re.Group.get g 4 in
+    let count = Option.value ~default:0 (parse_number_word count_str) in
+    let target = if String.sub target_str 0 1 = "i" then Innocents else Criminals in
+    let region = 
+      if String.length region_str >= 3 && String.sub region_str 0 3 = "row" then
+        match parse_row region_str with Some r -> Row r | None -> failwith "bad row"
+      else
+        match parse_column region_str with Some c -> Column c | None -> failwith "bad col"
+    in
+    (* This row/column has exactly N *)
+    add (Count (region, target, Eq count));
+    (* All other rows/columns do NOT have exactly N *)
+    if region_type = "row" then begin
+      let all_rows = [R1; R2; R3; R4; R5] in
+      let this_row = match region with Row r -> r | _ -> failwith "expected row" in
+      List.iter (fun other_row ->
+        if not (equal_row this_row other_row) then
+          add (Not (Count (Row other_row, target, Eq count)))
+      ) all_rows
+    end else begin
+      let all_cols = [A; B; C; D] in
+      let this_col = match region with Column c -> c | _ -> failwith "expected column" in
+      List.iter (fun other_col ->
+        if not (equal_column this_col other_col) then
+          add (Not (Count (Column other_col, target, Eq count)))
       ) all_cols
     end
   with _ -> ());

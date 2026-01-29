@@ -500,6 +500,44 @@ let parse_clue ~speaker ~clue ~all_names : constraint_expr list =
     end
   with _ -> ());
   
+  (* Pattern: "Row/Column X is the only row/column with exactly N criminals/innocents" *)
+  (* e.g. "Row 5 is the only row with exactly one criminal" *)
+  let only_with_exactly = Re.Pcre.regexp ~flags:[`CASELESS]
+    "(row\\s+\\d|column\\s+[A-Da-d])\\s+is\\s+the\\s+only\\s+(row|column)\\s+with\\s+(?:exactly\\s+)?(\\d+|one|two|three|four|five|zero|no)\\s+(criminals?|innocents?)" in
+  (try
+    let g = Re.exec only_with_exactly clue_lower in
+    let region_str = Re.Group.get g 1 in
+    let region_type = Re.Group.get g 2 in
+    let count_str = Re.Group.get g 3 in
+    let target_str = Re.Group.get g 4 in
+    let count = Option.value ~default:0 (parse_number_word count_str) in
+    let target = if String.sub target_str 0 1 = "i" then Innocents else Criminals in
+    let region = 
+      if String.length region_str >= 3 && String.sub region_str 0 3 = "row" then
+        match parse_row region_str with Some r -> Row r | None -> failwith "bad row"
+      else
+        match parse_column region_str with Some c -> Column c | None -> failwith "bad col"
+    in
+    (* This row/column has exactly N *)
+    add (Count (region, target, Eq count));
+    (* All other rows/columns do NOT have exactly N *)
+    if region_type = "row" then begin
+      let all_rows = [R1; R2; R3; R4; R5] in
+      let this_row = match region with Row r -> r | _ -> failwith "expected row" in
+      List.iter (fun other_row ->
+        if not (equal_row this_row other_row) then
+          add (Not (Count (Row other_row, target, Eq count)))
+      ) all_rows
+    end else begin
+      let all_cols = [A; B; C; D] in
+      let this_col = match region with Column c -> c | _ -> failwith "expected column" in
+      List.iter (fun other_col ->
+        if not (equal_column this_col other_col) then
+          add (Not (Count (Column other_col, target, Eq count)))
+      ) all_cols
+    end
+  with _ -> ());
+  
   (* Pattern: "X and Y share an odd/even number of innocent/criminal neighbors" *)
   let share_neighbors = Re.Pcre.regexp ~flags:[`CASELESS]
     "(\\w+)\\s+and\\s+(\\w+)\\s+share\\s+(?:an?\\s+)?(odd|even)\\s+number\\s+of\\s+(innocent|criminal)\\s+neighbors?" in
