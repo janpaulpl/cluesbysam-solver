@@ -470,6 +470,32 @@ let parse_clue ~speaker ~clue ~all_names : constraint_expr list =
     end
   with _ -> ());
   
+  (* Pattern: "Exactly/Only N innocents/criminals in [region] is/are neighboring X" *)
+  (* e.g. "Exactly 1 innocent in row 5 is neighboring Saga" *)
+  let simple_region_neighbor = Re.Pcre.regexp ~flags:[`CASELESS]
+    "(?:only|exactly)\\s+(\\d+|one|two|three|four|five|six|seven|eight|zero|no)\\s+(innocents?|criminals?)\\s+(?:in|on)\\s+(?:the\\s+)?(row\\s+\\d|column\\s+[A-Da-d]|edges?|corners?)\\s+(?:is|are)\\s+(?:neighboring|neighbour(?:ing)?|neighbors?\\s+of|neighbours?\\s+of)\\s+(\\w+)" in
+  (try
+    let g = Re.exec simple_region_neighbor clue in
+    let count_str = Re.Group.get g 1 in
+    let target_str = String.lowercase_ascii (Re.Group.get g 2) in
+    let region_str = String.lowercase_ascii (Re.Group.get g 3) in
+    let person_name = Re.Group.get g 4 in
+    if List.mem person_name all_names then begin
+      let count = Option.value ~default:0 (parse_number_word count_str) in
+      let target = if String.sub target_str 0 1 = "i" then Innocents else Criminals in
+      let region = 
+        if String.length region_str >= 3 && String.sub region_str 0 3 = "row" then
+          match parse_row region_str with Some r -> Row r | None -> failwith "bad row"
+        else if String.length region_str >= 3 && String.sub region_str 0 3 = "col" then
+          match parse_column region_str with Some c -> Column c | None -> failwith "bad col"
+        else if String.length region_str >= 4 && String.sub region_str 0 4 = "edge" then Edges
+        else if String.length region_str >= 4 && String.sub region_str 0 4 = "corn" then Corners
+        else failwith "unknown region"
+      in
+      add (RegionNeighborCount (region, target, person_name, Eq count))
+    end
+  with _ -> ());
+  
   (* Pattern: "There are N criminals/innocents in total" or "N criminals/innocents total" *)
   let total_count = Re.Pcre.regexp ~flags:[`CASELESS]
     "(?:there\\s+are\\s+)?(\\d+|one|two|three|four|five|six|seven|eight|nine|ten)\\s+(criminals?|innocents?)\\s+(?:in\\s+)?total" in

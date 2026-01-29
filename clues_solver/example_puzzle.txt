@@ -1,4 +1,4 @@
-A1, Bonnie, NO DESCRIPTION YET
+A1, Bonnie, All criminals in column D are connected
 A2, Gary, Exactly 2 of Peter's 3 innocent neighbors also neighbor Oscar
 A3, Kyle, There's an odd number of innocents below Hazel
 A4, Oscar, Who could it be, that mysterious innocent living on the edge?
@@ -13,8 +13,8 @@ C2, Ivan, NO DESCRIPTION YET
 C3, Mark, NO DESCRIPTION YET
 C4, Saga, NO DESCRIPTION YET
 C5, Xena, NO DESCRIPTION YET
-D1, Freya, NO DESCRIPTION YET
-D2, Janet, NO DESCRIPTION YET
+D1, Freya, There are exactly 2 innocents to the left of Ziad
+D2, Janet, There's plenty of us criminals here, that's for sure.
 D3, Nick, NO DESCRIPTION YET
-D4, Terry, NO DESCRIPTION YET
-D5, Ziad, NO DESCRIPTION YET
+D4, Terry, There are more criminals in column A than column B
+D5, Ziad, Not me! I'm far from innocent! Yesterday I stole candy from a kid.
