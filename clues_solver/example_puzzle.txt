@@ -1,12 +1,12 @@
 A1, Bonnie, NO DESCRIPTION YET
-A2, Gary, NO DESCRIPTION YET
-A3, Kyle, NO DESCRIPTION YET
+A2, Gary, Exactly 2 of Peter's 3 innocent neighbors also neighbor Oscar
+A3, Kyle, There's an odd number of innocents below Hazel
 A4, Oscar, NO DESCRIPTION YET
-A5, Uma, NO DESCRIPTION YET
+A5, Uma, All criminals in column A are connected
 B1, Debra, NO DESCRIPTION YET
 B2, Hazel, NO DESCRIPTION YET
 B3, Laura, NO DESCRIPTION YET
-B4, Peter, NO DESCRIPTION YET
+B4, Peter, Only 1 of the 2 innocents in column B is Laura's neighbor
 B5, Wally, NO DESCRIPTION YET
 C1, Evie, Uma is one of 3 innocents on the edges
 C2, Ivan, NO DESCRIPTION YET

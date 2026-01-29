@@ -91,22 +91,76 @@ let parse_clue ~speaker ~clue ~all_names : constraint_expr list =
     add (Connected (Column col, Criminals))
   with _ -> ());
   
-  (* Pattern: "X is one of N innocents/criminals on the edges" *)
-  let one_of_edges = Re.Pcre.regexp ~flags:[`CASELESS]
-    "(\\w+)\\s+is\\s+one\\s+of\\s+(\\d+|one|two|three|four|five|six|seven|eight)\\s+(innocents?|criminals?)\\s+on\\s+the\\s+edges?" in
+  (* Pattern: "X is one of N innocents/criminals on the edges/corners/in row/column" *)
+  let one_of_region = Re.Pcre.regexp ~flags:[`CASELESS]
+    "(\\w+)\\s+is\\s+one\\s+of\\s+(\\d+|one|two|three|four|five|six|seven|eight)\\s+(innocents?|criminals?)\\s+(?:in|on)\\s+(?:the\\s+)?(row\\s+\\d|column\\s+[A-Da-d]|edges?|corners?)" in
   (try
-    let g = Re.exec one_of_edges clue in
+    let g = Re.exec one_of_region clue in
     let name = Re.Group.get g 1 in
     let count_str = Re.Group.get g 2 in
     let target_str = String.lowercase_ascii (Re.Group.get g 3) in
+    let region_str = String.lowercase_ascii (Re.Group.get g 4) in
     if List.mem name all_names then begin
       let count = Option.value ~default:0 (parse_number_word count_str) in
       let target = if String.sub target_str 0 1 = "i" then Innocents else Criminals in
-      add (Count (Edges, target, Eq count));
+      let region = 
+        if String.length region_str >= 3 && String.sub region_str 0 3 = "row" then
+          match parse_row region_str with Some r -> Row r | None -> failwith "bad row"
+        else if String.length region_str >= 3 && String.sub region_str 0 3 = "col" then
+          match parse_column region_str with Some c -> Column c | None -> failwith "bad col"
+        else if String.length region_str >= 4 && String.sub region_str 0 4 = "edge" then Edges
+        else if String.length region_str >= 4 && String.sub region_str 0 4 = "corn" then Corners
+        else failwith "unknown region"
+      in
+      add (Count (region, target, Eq count));
       add (if target = Innocents then IsInnocent name else IsCriminal name)
     end
   with _ -> ());
   
+  (* Pattern: "X is one of Y's N innocent/criminal neighbors" *)
+  (* e.g. "Terry is one of Saga's 6 criminal neighbors" *)
+  let one_of_neighbors = Re.Pcre.regexp ~flags:[`CASELESS]
+    "(\\w+)\\s+is\\s+one\\s+of\\s+(\\w+)'s\\s+(\\d+|one|two|three|four|five|six|seven|eight)\\s+(innocent|criminal)\\s+neighbors?" in
+  (try
+    let g = Re.exec one_of_neighbors clue in
+    let name1 = Re.Group.get g 1 in
+    let name2 = Re.Group.get g 2 in
+    let count_str = Re.Group.get g 3 in
+    let target_str = String.lowercase_ascii (Re.Group.get g 4) in
+    if List.mem name1 all_names && List.mem name2 all_names then begin
+      let count = Option.value ~default:0 (parse_number_word count_str) in
+      let neighbor_target = if target_str = "innocent" then InnocentNeighbors else CriminalNeighbors in
+      (* Y has N innocent/criminal neighbors *)
+      add (PersonCount (name2, neighbor_target, Eq count));
+      (* X is innocent/criminal *)
+      add (if target_str = "innocent" then IsInnocent name1 else IsCriminal name1)
+    end
+  with _ -> ());
+  
+  (* Pattern: "Only N [more] innocents/criminals in/on [region]" *)
+  (* e.g. "Only one more innocents in the edges" means exactly 1 innocent on edges *)
+  let only_count_region = Re.Pcre.regexp ~flags:[`CASELESS]
+    "only\\s+(\\d+|one|two|three|four|five|six|seven|eight|zero|no)\\s+(?:more\\s+)?(innocents?|criminals?)\\s+(?:in|on)\\s+(?:the\\s+)?(row\\s+\\d|column\\s+[A-Da-d]|edges?|corners?|entire\\s+grid)" in
+  (try
+    let g = Re.exec only_count_region clue_lower in
+    let count_str = Re.Group.get g 1 in
+    let target_str = Re.Group.get g 2 in
+    let region_str = Re.Group.get g 3 in
+    let count = Option.value ~default:0 (parse_number_word count_str) in
+    let target = if String.sub target_str 0 1 = "i" then Innocents else Criminals in
+    let region = 
+      if String.length region_str >= 3 && String.sub region_str 0 3 = "row" then
+        match parse_row region_str with Some r -> Row r | None -> failwith "bad row"
+      else if String.length region_str >= 3 && String.sub region_str 0 3 = "col" then
+        match parse_column region_str with Some c -> Column c | None -> failwith "bad col"
+      else if String.length region_str >= 4 && String.sub region_str 0 4 = "edge" then Edges
+      else if String.length region_str >= 4 && String.sub region_str 0 4 = "corn" then Corners
+      else if String.length region_str >= 6 && String.sub region_str 0 6 = "entire" then Entire_grid
+      else failwith "unknown region"
+    in
+    add (Count (region, target, Eq count))
+  with _ -> ());
+
   (* Pattern: "There are N criminals/innocents in row/column X" *)
   let count_region = Re.Pcre.regexp ~flags:[`CASELESS]
     "there\\s+(?:are|is)\\s+(\\d+|one|two|three|four|five|zero|no)\\s+(criminals?|innocents?)\\s+in\\s+(row\\s+\\d|column\\s+[A-Da-d])" in
