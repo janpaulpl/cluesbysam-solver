@@ -317,6 +317,29 @@ let parse_clue ~speaker ~clue ~all_names : constraint_expr list =
     end
   with _ -> ());
   
+  (* Pattern: "Exactly N of X's M innocent/criminal neighbors also neighbor Y" *)
+  (* e.g. "Exactly 2 of Peter's 3 innocent neighbors also neighbor Oscar" *)
+  let neighbors_also_neighbor = Re.Pcre.regexp ~flags:[`CASELESS]
+    "exactly\\s+(\\d+|one|two|three|four|five|six|seven|eight)\\s+of\\s+(\\w+)'s\\s+(\\d+|one|two|three|four|five|six|seven|eight)\\s+(innocent|criminal)\\s+neighbors?\\s+also\\s+neighbors?\\s+(\\w+)" in
+  (try
+    let g = Re.exec neighbors_also_neighbor clue in
+    let shared_count_str = Re.Group.get g 1 in
+    let name1 = Re.Group.get g 2 in
+    let total_count_str = Re.Group.get g 3 in
+    let target_str = String.lowercase_ascii (Re.Group.get g 4) in
+    let name2 = Re.Group.get g 5 in
+    if List.mem name1 all_names && List.mem name2 all_names then begin
+      let shared_count = Option.value ~default:0 (parse_number_word shared_count_str) in
+      let total_count = Option.value ~default:0 (parse_number_word total_count_str) in
+      let target = if target_str = "innocent" then Innocents else Criminals in
+      let neighbor_target = if target_str = "innocent" then InnocentNeighbors else CriminalNeighbors in
+      (* X has M innocent/criminal neighbors *)
+      add (PersonCount (name1, neighbor_target, Eq total_count));
+      (* N of the common neighbors of X and Y are innocent/criminal *)
+      add (ShareNeighbors (name1, name2, target, Eq shared_count))
+    end
+  with _ -> ());
+  
   (* Pattern: "There are N criminals/innocents in total" or "N criminals/innocents total" *)
   let total_count = Re.Pcre.regexp ~flags:[`CASELESS]
     "(?:there\\s+are\\s+)?(\\d+|one|two|three|four|five|six|seven|eight|nine|ten)\\s+(criminals?|innocents?)\\s+(?:in\\s+)?total" in
