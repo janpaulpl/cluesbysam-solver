@@ -1,4 +1,4 @@
-# dune exec clues_solver -- example_puzzle.txt
+# dune exec clues_solver -- puzzles/jan292026.txt
 # OCAMLPARAM: unset
 # Shared cache: enabled-except-user-rules
 # Shared cache location: /home/janpaulpl/.cache/dune/db
@@ -13,4 +13,4 @@
 #  ; build_dir = In_build_dir "default"
 #  ; instrument_with = []
 #  }
-$ /home/janpaulpl/.opam/clues-solver/bin/ocamlc.opt -config > /tmp/dune_723aca_output
+$ /home/janpaulpl/.opam/clues-solver/bin/ocamlc.opt -config > /tmp/dune_e6bb03_output

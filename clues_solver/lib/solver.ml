@@ -226,6 +226,13 @@ module Z3Solver = struct
       let count2 = count_in_people state target2 people2 in
       Z3.Arithmetic.mk_gt state.ctx count1 count2
     
+    | EqualCount (region1, target1, region2, target2) ->
+      let people1 = people_in_region state region1 in
+      let people2 = people_in_region state region2 in
+      let count1 = count_in_people state target1 people1 in
+      let count2 = count_in_people state target2 people2 in
+      Z3.Boolean.mk_eq state.ctx count1 count2
+    
     | TheMost (name, target) ->
       let my_count = count_neighbors state name target in
       let others = List.filter (fun p -> p.name <> name) state.puzzle.people in

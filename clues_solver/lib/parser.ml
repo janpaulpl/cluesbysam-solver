@@ -26,17 +26,30 @@ let parse_number_word s =
 (** Parse a row reference *)
 let parse_row s =
   let s = String.lowercase_ascii (String.trim s) in
-  if String.length s >= 5 && String.sub s 0 3 = "row" then
-    match String.trim (String.sub s 3 (String.length s - 3)) with
-    | "1" -> Some R1 | "2" -> Some R2 | "3" -> Some R3 
-    | "4" -> Some R4 | "5" -> Some R5 | _ -> None
-  else None
+  (* Handle both "row X" and "rows X" *)
+  let rest = 
+    if String.length s >= 5 && String.sub s 0 4 = "rows" then
+      String.trim (String.sub s 4 (String.length s - 4))
+    else if String.length s >= 4 && String.sub s 0 3 = "row" then
+      String.trim (String.sub s 3 (String.length s - 3))
+    else ""
+  in
+  match rest with
+  | "1" -> Some R1 | "2" -> Some R2 | "3" -> Some R3 
+  | "4" -> Some R4 | "5" -> Some R5 | _ -> None
 
 (** Parse a column reference *)  
 let parse_column s =
   let s = String.lowercase_ascii (String.trim s) in
-  if String.length s >= 6 && String.sub s 0 6 = "column" then
+  (* Handle both "column X" and "columns X" *)
+  if String.length s >= 7 && String.sub s 0 7 = "columns" then
+    match String.trim (String.sub s 7 (String.length s - 7)) |> String.uppercase_ascii with
+    | "A" -> Some A | "B" -> Some B | "C" -> Some C | "D" -> Some D | _ -> None
+  else if String.length s >= 6 && String.sub s 0 6 = "column" then
     match String.trim (String.sub s 6 (String.length s - 6)) |> String.uppercase_ascii with
+    | "A" -> Some A | "B" -> Some B | "C" -> Some C | "D" -> Some D | _ -> None
+  else if String.length s >= 4 && String.sub s 0 4 = "cols" then
+    match String.trim (String.sub s 4 (String.length s - 4)) |> String.uppercase_ascii with
     | "A" -> Some A | "B" -> Some B | "C" -> Some C | "D" -> Some D | _ -> None
   else if String.length s >= 3 && String.sub s 0 3 = "col" then
     match String.trim (String.sub s 3 (String.length s - 3)) |> String.uppercase_ascii with
@@ -297,6 +310,22 @@ let parse_clue ~speaker ~clue ~all_names : constraint_expr list =
     add (PersonCount (speaker, target, comparison))
   with _ -> ());
   
+  (* Pattern: "There's an odd/even number of criminals/innocents neighboring X" *)
+  (* e.g. "There's an odd number of criminals neighboring Saga" *)
+  let neighboring_count = Re.Pcre.regexp ~flags:[`CASELESS]
+    "(?:there(?:'s|\\s+is|\\s+are)\\s+)?(?:an?\\s+)?(odd|even)\\s+number\\s+of\\s+(criminals?|innocents?)\\s+neighboring\\s+(\\w+)" in
+  (try
+    let g = Re.exec neighboring_count clue in
+    let parity = String.lowercase_ascii (Re.Group.get g 1) in
+    let target_str = String.lowercase_ascii (Re.Group.get g 2) in
+    let name = Re.Group.get g 3 in
+    if List.mem name all_names then begin
+      let target = if String.sub target_str 0 1 = "i" then InnocentNeighbors else CriminalNeighbors in
+      let comparison = if parity = "odd" then Odd else Even in
+      add (PersonCount (name, target, comparison))
+    end
+  with _ -> ());
+  
   (* Pattern: "X and Y are both innocent/criminal" *)
   let both_same = Re.Pcre.regexp ~flags:[`CASELESS]
     "(\\w+)\\s+and\\s+(\\w+)\\s+are\\s+both\\s+(innocent|criminal)" in
@@ -403,6 +432,38 @@ let parse_clue ~speaker ~clue ~all_names : constraint_expr list =
     | Some region1, Some region2 ->
       add (MoreThan (region1, target, region2, target))
     | _ -> ()
+  with _ -> ());
+  
+  (* Pattern: "[There's an] equal number of innocents/criminals in [region1] and [region2]" *)
+  (* e.g. "There's an equal number of innocents in rows 1 and 3" *)
+  (* Handles: "rows 1 and 3", "row 1 and row 3", "columns A and B" *)
+  let equal_count_regions = Re.Pcre.regexp ~flags:[`CASELESS]
+    "(?:there(?:'s|\\s+is|\\s+are)\\s+)?(?:an?\\s+)?equal\\s+number\\s+of\\s+(innocents?|criminals?)\\s+in\\s+(rows?\\s+\\d|columns?\\s+[A-Da-d])\\s+and\\s+(?:rows?\\s+|columns?\\s+)?(\\d|[A-Da-d])" in
+  (try
+    let g = Re.exec equal_count_regions clue_lower in
+    let target_str = Re.Group.get g 1 in
+    let region1_str = Re.Group.get g 2 in
+    let region2_ref = String.uppercase_ascii (Re.Group.get g 3) in
+    let target = if String.sub target_str 0 1 = "i" then Innocents else Criminals in
+    (* Determine if we're dealing with rows or columns from region1 *)
+    let is_row = String.length region1_str >= 3 && String.sub region1_str 0 3 = "row" in
+    let region1 = 
+      if is_row then
+        match parse_row region1_str with Some r -> Row r | None -> failwith "bad row"
+      else
+        match parse_column region1_str with Some c -> Column c | None -> failwith "bad col"
+    in
+    let region2 =
+      if is_row then
+        match region2_ref with
+        | "1" -> Row R1 | "2" -> Row R2 | "3" -> Row R3 | "4" -> Row R4 | "5" -> Row R5
+        | _ -> failwith "bad row ref"
+      else
+        match region2_ref with
+        | "A" -> Column A | "B" -> Column B | "C" -> Column C | "D" -> Column D
+        | _ -> failwith "bad col ref"
+    in
+    add (EqualCount (region1, target, region2, target))
   with _ -> ());
   
   (* Pattern: "Row/Column X has more innocents/criminals than any other row/column" *)

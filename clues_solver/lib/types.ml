@@ -82,6 +82,7 @@ type constraint_expr =
   
   (* Comparisons between regions/people *)
   | MoreThan of region * count_target * region * count_target
+  | EqualCount of region * count_target * region * count_target  (* Equal counts in two regions *)
   | TheMost of string * count_target   (* X has uniquely the most *)
   | TheLeast of string * count_target
   | SameAs of string * count_target * string  (* X has same count as Y *)
