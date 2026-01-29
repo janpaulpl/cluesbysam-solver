@@ -137,10 +137,10 @@ let parse_clue ~speaker ~clue ~all_names : constraint_expr list =
     end
   with _ -> ());
   
-  (* Pattern: "Only N [more] innocents/criminals in/on [region]" *)
-  (* e.g. "Only one more innocents in the edges" means exactly 1 innocent on edges *)
+  (* Pattern: "Only N innocents/criminals in/on [region]" - exact count *)
+  (* Note: Do NOT match "more" - "only one more" is comparative, not absolute *)
   let only_count_region = Re.Pcre.regexp ~flags:[`CASELESS]
-    "only\\s+(\\d+|one|two|three|four|five|six|seven|eight|zero|no)\\s+(?:more\\s+)?(innocents?|criminals?)\\s+(?:in|on)\\s+(?:the\\s+)?(row\\s+\\d|column\\s+[A-Da-d]|edges?|corners?|entire\\s+grid)" in
+    "only\\s+(\\d+|one|two|three|four|five|six|seven|eight|zero|no)\\s+(innocents?|criminals?)\\s+(?:in|on)\\s+(?:the\\s+)?(row\\s+\\d|column\\s+[A-Da-d]|edges?|corners?|entire\\s+grid)" in
   (try
     let g = Re.exec only_count_region clue_lower in
     let count_str = Re.Group.get g 1 in
@@ -159,6 +159,34 @@ let parse_clue ~speaker ~clue ~all_names : constraint_expr list =
       else failwith "unknown region"
     in
     add (Count (region, target, Eq count))
+  with _ -> ());
+  
+  (* Pattern: "Only N more innocents/criminals in/on [region] than [other region]" *)
+  (* e.g. "Only one more innocent on the edges than in the corners" *)
+  let more_than_region = Re.Pcre.regexp ~flags:[`CASELESS]
+    "only\\s+(\\d+|one|two|three|four|five|six|seven|eight|zero|no)\\s+more\\s+(innocents?|criminals?)\\s+(?:in|on)\\s+(?:the\\s+)?(row\\s+\\d|column\\s+[A-Da-d]|edges?|corners?)\\s+than\\s+(?:in|on)?\\s*(?:the\\s+)?(row\\s+\\d|column\\s+[A-Da-d]|edges?|corners?)" in
+  (try
+    let g = Re.exec more_than_region clue_lower in
+    let diff_str = Re.Group.get g 1 in
+    let target_str = Re.Group.get g 2 in
+    let region1_str = Re.Group.get g 3 in
+    let region2_str = Re.Group.get g 4 in
+    let _diff = Option.value ~default:0 (parse_number_word diff_str) in
+    let target = if String.sub target_str 0 1 = "i" then Innocents else Criminals in
+    let parse_region_str s =
+      if String.length s >= 3 && String.sub s 0 3 = "row" then
+        match parse_row s with Some r -> Row r | None -> failwith "bad row"
+      else if String.length s >= 3 && String.sub s 0 3 = "col" then
+        match parse_column s with Some c -> Column c | None -> failwith "bad col"
+      else if String.length s >= 4 && String.sub s 0 4 = "edge" then Edges
+      else if String.length s >= 4 && String.sub s 0 4 = "corn" then Corners
+      else failwith "unknown region"
+    in
+    let region1 = parse_region_str region1_str in
+    let region2 = parse_region_str region2_str in
+    (* "N more X in R1 than R2" means count(R1) > count(R2) *)
+    (* For now, just encode as "more in R1 than R2" since we don't have a DiffEq constraint *)
+    add (MoreThan (region1, target, region2, target))
   with _ -> ());
 
   (* Pattern: "There are N criminals/innocents in row/column X" *)
