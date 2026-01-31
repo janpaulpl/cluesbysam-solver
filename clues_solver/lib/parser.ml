@@ -484,6 +484,32 @@ let parse_clue ~speaker ~clue ~all_names : constraint_expr list =
     | _ -> ()
   with _ -> ());
   
+  (* Pattern: "There are more innocent/criminal [profession1] than innocent/criminal [profession2]" *)
+  (* e.g. "There are more innocent clerks than innocent coders" *)
+  let more_profession_than = Re.Pcre.regexp ~flags:[`CASELESS]
+    "(?:there\\s+are\\s+)?more\\s+(innocent|criminal)\\s+(\\w+)\\s+than\\s+(innocent|criminal)\\s+(\\w+)" in
+  (try
+    let g = Re.exec more_profession_than clue_lower in
+    let target1_str = Re.Group.get g 1 in
+    let profession1 = Re.Group.get g 2 in
+    let target2_str = Re.Group.get g 3 in
+    let profession2 = Re.Group.get g 4 in
+    let target1 = if target1_str = "innocent" then Innocents else Criminals in
+    let target2 = if target2_str = "innocent" then Innocents else Criminals in
+    (* Remove trailing 's' from profession if plural *)
+    let prof1_singular = 
+      let len = String.length profession1 in
+      if len > 1 && profession1.[len-1] = 's' then String.sub profession1 0 (len - 1)
+      else profession1
+    in
+    let prof2_singular = 
+      let len = String.length profession2 in
+      if len > 1 && profession2.[len-1] = 's' then String.sub profession2 0 (len - 1)
+      else profession2
+    in
+    add (MoreThan (Profession prof1_singular, target1, Profession prof2_singular, target2))
+  with _ -> ());
+  
   (* Pattern: "[There's an] equal number of innocents/criminals in [region1] and [region2]" *)
   (* e.g. "There's an equal number of innocents in rows 1 and 3" *)
   (* Handles: "rows 1 and 3", "row 1 and row 3", "columns A and B" *)

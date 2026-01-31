@@ -3,7 +3,7 @@ A2, Erwin, painter, 2 out of 3 coders have a criminal directly below them
 A3, Jerry, cop, Each column has at least 2 innocents
 A4, Nancy, farmer, Only 1 of the 2 innocents in row 1 is Chloe's neighbor
 A5, Salil, clerk, NO DESCRIPTION YET
-B1, Bobby, coder, NO DESCRIPTION YET
+B1, Bobby, coder, There are more innocent clerks than innocent coders
 B2, Gabe, coder, There is only one innocent to the left of Wanda
 B3, Kyle, painter, NO DESCRIPTION YET
 B4, Olive, painter, Exactly 2 of the 4 innocents neighboring Jerry are above Salil
