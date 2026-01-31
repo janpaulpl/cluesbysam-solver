@@ -23,6 +23,7 @@ type status =
 type person = {
   pos : position;
   name : string;
+  profession : string option;  (* None means no profession specified *)
   clue : string option;  (* None means not yet revealed *)
   known_status : status; (* What we've determined so far *)
 }
@@ -50,6 +51,11 @@ type region =
   | Above of string            (* People above a named person (same column, lower row number) *)
   | LeftOf of string           (* People to the left of a named person (same row) *)
   | RightOf of string          (* People to the right of a named person (same row) *)
+  | DirectlyBelow of string    (* The single cell directly below *)
+  | DirectlyAbove of string    (* The single cell directly above *)
+  | DirectlyLeftOf of string   (* The single cell directly to the left *)
+  | DirectlyRightOf of string  (* The single cell directly to the right *)
+  | Profession of string       (* All people with a given profession *)
   | Custom of string list      (* Explicit list of names *)
 [@@deriving show]
 
@@ -68,6 +74,10 @@ type count_target =
   | Innocents
   | CriminalNeighbors
   | InnocentNeighbors
+  | Everyone  (* Count all people in region, regardless of status *)
+[@@deriving show]
+
+type direction = DirAbove | DirBelow | DirLeft | DirRight
 [@@deriving show]
 
 (** Constraint types that clues translate into *)
@@ -112,6 +122,10 @@ type constraint_expr =
   (* Count of people in [region] who have [comparison1] [target] neighbors, total count is [comparison2] *)
   (* e.g., "Only one person in column C has exactly 5 criminal neighbors" *)
   | CountPeopleWithNeighbors of region * count_target * comparison * comparison
+  
+  (* Count of people in [region] who have a [target] directly [direction], total is [comparison] *)
+  (* e.g., "2 out of 3 coders have a criminal directly below them" *)
+  | CountPeopleWithDirectlyAdjacent of region * count_target * direction * comparison
   
   (* Location-based *)
   | SomeoneInRegion of region * count_target  (* At least one criminal/innocent in region *)
@@ -268,4 +282,28 @@ module Position = struct
       if c > ci then Some { col = int_to_col c; row = pos.row }
       else None
     ) [0; 1; 2; 3]
+  
+  (** Get the single position directly below (if exists) *)
+  let directly_below pos =
+    let ri = row_to_int pos.row in
+    if ri < 4 then Some { col = pos.col; row = int_to_row (ri + 1) }
+    else None
+  
+  (** Get the single position directly above (if exists) *)
+  let directly_above pos =
+    let ri = row_to_int pos.row in
+    if ri > 0 then Some { col = pos.col; row = int_to_row (ri - 1) }
+    else None
+  
+  (** Get the single position directly to the left (if exists) *)
+  let directly_left pos =
+    let ci = col_to_int pos.col in
+    if ci > 0 then Some { col = int_to_col (ci - 1); row = pos.row }
+    else None
+  
+  (** Get the single position directly to the right (if exists) *)
+  let directly_right pos =
+    let ci = col_to_int pos.col in
+    if ci < 3 then Some { col = int_to_col (ci + 1); row = pos.row }
+    else None
 end

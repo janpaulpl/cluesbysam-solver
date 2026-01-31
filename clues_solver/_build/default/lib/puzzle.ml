@@ -94,6 +94,40 @@ let people_in_region puzzle region =
        List.filter (fun p ->
          List.exists (equal_position p.pos) right_positions
        ) puzzle.people)
+  | DirectlyBelow name ->
+    (match find_by_name puzzle name with
+     | None -> []
+     | Some person ->
+       match Position.directly_below person.pos with
+       | None -> []
+       | Some pos -> List.filter (fun p -> equal_position p.pos pos) puzzle.people)
+  | DirectlyAbove name ->
+    (match find_by_name puzzle name with
+     | None -> []
+     | Some person ->
+       match Position.directly_above person.pos with
+       | None -> []
+       | Some pos -> List.filter (fun p -> equal_position p.pos pos) puzzle.people)
+  | DirectlyLeftOf name ->
+    (match find_by_name puzzle name with
+     | None -> []
+     | Some person ->
+       match Position.directly_left person.pos with
+       | None -> []
+       | Some pos -> List.filter (fun p -> equal_position p.pos pos) puzzle.people)
+  | DirectlyRightOf name ->
+    (match find_by_name puzzle name with
+     | None -> []
+     | Some person ->
+       match Position.directly_right person.pos with
+       | None -> []
+       | Some pos -> List.filter (fun p -> equal_position p.pos pos) puzzle.people)
+  | Profession prof ->
+    List.filter (fun p ->
+      match p.profession with
+      | None -> false
+      | Some pr -> String.lowercase_ascii pr = String.lowercase_ascii prof
+    ) puzzle.people
   | Custom names ->
     List.filter (fun p ->
       List.exists (fun n -> 
@@ -128,19 +162,35 @@ let parse_from_string content =
   let lines = String.split_on_char '\n' content in
   let lines = List.filter (fun s -> String.trim s <> "") lines in
   let people = List.filter_map (fun line ->
-    (* Expected format: "A1, Name, Description" or "A1, Name, NO DESCRIPTION YET" *)
+    (* Expected formats: 
+       - "A1, Name, Description" (no profession)
+       - "A1, Name, profession, Description" (with profession) *)
     match String.split_on_char ',' line with
-    | pos_str :: name :: rest ->
+    | pos_str :: name :: rest when List.length rest >= 1 ->
       let pos_str = String.trim pos_str in
       let name = String.trim name in
-      let desc = String.trim (String.concat "," rest) in
       (try
         let pos = Position.parse pos_str in
+        (* Check if we have a profession (4+ fields and 3rd field is short/single word) *)
+        let (profession, clue_parts) = 
+          match rest with
+          | prof :: clue_rest when List.length rest >= 2 ->
+            let prof_trimmed = String.trim prof in
+            (* If it's a short word without much punctuation, treat as profession *)
+            if String.length prof_trimmed <= 20 && 
+               not (String.contains prof_trimmed '.') &&
+               prof_trimmed <> "NO DESCRIPTION YET" then
+              (Some prof_trimmed, clue_rest)
+            else
+              (None, rest)
+          | _ -> (None, rest)
+        in
+        let desc = String.trim (String.concat "," clue_parts) in
         let clue = 
           if desc = "NO DESCRIPTION YET" || desc = "" then None 
           else Some desc 
         in
-        Some { pos; name; clue; known_status = Unknown }
+        Some { pos; name; profession; clue; known_status = Unknown }
       with _ -> None)
     | _ -> None
   ) lines in
@@ -155,14 +205,20 @@ let to_string puzzle =
   ) puzzle.people in
   String.concat "\n" (List.map (fun p ->
     let clue_str = match p.clue with None -> "NO DESCRIPTION YET" | Some c -> c in
+    let prof_str = match p.profession with None -> "" | Some pr -> pr ^ ", " in
     let status_str = match p.known_status with
       | Unknown -> ""
       | Innocent -> " [INNOCENT]"
       | Criminal -> " [CRIMINAL]"
     in
-    Printf.sprintf "%s, %s, %s%s" 
-      (Position.to_string p.pos) p.name clue_str status_str
+    Printf.sprintf "%s, %s, %s%s%s" 
+      (Position.to_string p.pos) p.name prof_str clue_str status_str
   ) sorted)
+
+(** Get all unique professions in the puzzle *)
+let all_professions puzzle =
+  let profs = List.filter_map (fun p -> p.profession) puzzle.people in
+  List.sort_uniq String.compare profs
 
 (** Load puzzle from file *)
 let load_from_file filename =

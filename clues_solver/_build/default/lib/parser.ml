@@ -775,6 +775,38 @@ let parse_clue ~speaker ~clue ~all_names : constraint_expr list =
     end
   with _ -> ());
   
+  (* Pattern: "N out of M [profession] have a criminal/innocent directly below/above/left/right of them" *)
+  (* e.g. "2 out of 3 coders have a criminal directly below them" *)
+  let profession_directly_adjacent = Re.Pcre.regexp ~flags:[`CASELESS]
+    "(\\d+|one|two|three|four|five)\\s+(?:out\\s+)?of\\s+(\\d+|one|two|three|four|five)\\s+(\\w+)\\s+have\\s+(?:a|an)\\s+(criminal|innocent)\\s+directly\\s+(below|above|to\\s+the\\s+left\\s+of|to\\s+the\\s+right\\s+of)\\s+them" in
+  (try
+    let g = Re.exec profession_directly_adjacent clue_lower in
+    let satisfy_count_str = Re.Group.get g 1 in
+    let total_count_str = Re.Group.get g 2 in
+    let profession = Re.Group.get g 3 in
+    let target_str = Re.Group.get g 4 in
+    let direction_str = Re.Group.get g 5 in
+    let satisfy_count = Option.value ~default:0 (parse_number_word satisfy_count_str) in
+    let total_count = Option.value ~default:0 (parse_number_word total_count_str) in
+    let target = if target_str = "innocent" then Innocents else Criminals in
+    let direction = 
+      if String.length direction_str >= 5 && String.sub direction_str 0 5 = "below" then DirBelow
+      else if String.length direction_str >= 5 && String.sub direction_str 0 5 = "above" then DirAbove
+      else if String.length direction_str > 10 && String.sub direction_str 0 11 = "to the left" then DirLeft
+      else DirRight
+    in
+    (* Remove trailing 's' from profession if plural (coders -> coder) *)
+    let profession_singular = 
+      let len = String.length profession in
+      if len > 1 && profession.[len-1] = 's' then String.sub profession 0 (len - 1)
+      else profession
+    in
+    (* There are M people with this profession *)
+    add (Count (Profession profession_singular, Everyone, Eq total_count));
+    (* N of them have the target directly adjacent *)
+    add (CountPeopleWithDirectlyAdjacent (Profession profession_singular, target, direction, Eq satisfy_count))
+  with _ -> ());
+  
   (* If no constraints were parsed, add an Unparsed marker *)
   if !constraints = [] then
     [Unparsed clue]

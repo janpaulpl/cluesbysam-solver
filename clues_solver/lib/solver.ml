@@ -41,20 +41,26 @@ module Z3Solver = struct
   
   (** Count criminals/innocents in a list of people *)
   let count_in_people state target people =
-    let vars = List.map (fun p ->
-      match target with
-      | Criminals | CriminalNeighbors -> is_criminal state p.name
-      | Innocents | InnocentNeighbors -> is_innocent state p.name
-    ) people in
-    if vars = [] then
-      Z3.Arithmetic.Integer.mk_numeral_i state.ctx 0
-    else
-      let ones = List.map (fun v ->
-        Z3.Boolean.mk_ite state.ctx v
-          (Z3.Arithmetic.Integer.mk_numeral_i state.ctx 1)
-          (Z3.Arithmetic.Integer.mk_numeral_i state.ctx 0)
-      ) vars in
-      Z3.Arithmetic.mk_add state.ctx ones
+    match target with
+    | Everyone ->
+      (* Just count all people in the list *)
+      Z3.Arithmetic.Integer.mk_numeral_i state.ctx (List.length people)
+    | _ ->
+      let vars = List.map (fun p ->
+        match target with
+        | Criminals | CriminalNeighbors -> is_criminal state p.name
+        | Innocents | InnocentNeighbors -> is_innocent state p.name
+        | Everyone -> failwith "Already handled"
+      ) people in
+      if vars = [] then
+        Z3.Arithmetic.Integer.mk_numeral_i state.ctx 0
+      else
+        let ones = List.map (fun v ->
+          Z3.Boolean.mk_ite state.ctx v
+            (Z3.Arithmetic.Integer.mk_numeral_i state.ctx 1)
+            (Z3.Arithmetic.Integer.mk_numeral_i state.ctx 0)
+        ) vars in
+        Z3.Arithmetic.mk_add state.ctx ones
   
   (** Count neighbors of a person with given status *)
   let count_neighbors state name target =
@@ -291,6 +297,42 @@ module Z3Solver = struct
         else Z3.Arithmetic.mk_add state.ctx person_satisfies
       in
       make_comparison state total total_comparison
+    
+    | CountPeopleWithDirectlyAdjacent (region, target, dir, comparison) ->
+      (* Count how many people in [region] have a [target] directly [dir] of them *)
+      let region_people = people_in_region state region in
+      let person_satisfies = List.map (fun p ->
+        (* Get the position directly adjacent in the given direction *)
+        let adj_pos = match dir with
+          | DirAbove -> Position.directly_above p.pos
+          | DirBelow -> Position.directly_below p.pos
+          | DirLeft -> Position.directly_left p.pos
+          | DirRight -> Position.directly_right p.pos
+        in
+        match adj_pos with
+        | None -> 
+          (* No cell in that direction, so condition is false -> 0 *)
+          Z3.Arithmetic.Integer.mk_numeral_i state.ctx 0
+        | Some pos ->
+          (* Find person at that position *)
+          match Puzzle.find_by_position state.puzzle pos with
+          | None ->
+            Z3.Arithmetic.Integer.mk_numeral_i state.ctx 0
+          | Some adj_person ->
+            let is_target = match target with
+              | Criminals -> is_criminal state adj_person.name
+              | Innocents -> is_innocent state adj_person.name
+              | _ -> failwith "Invalid target for directly adjacent"
+            in
+            Z3.Boolean.mk_ite state.ctx is_target
+              (Z3.Arithmetic.Integer.mk_numeral_i state.ctx 1)
+              (Z3.Arithmetic.Integer.mk_numeral_i state.ctx 0)
+      ) region_people in
+      let total = 
+        if person_satisfies = [] then Z3.Arithmetic.Integer.mk_numeral_i state.ctx 0
+        else Z3.Arithmetic.mk_add state.ctx person_satisfies
+      in
+      make_comparison state total comparison
     
     | SomeoneInRegion (region, target) ->
       let people = people_in_region state region in
