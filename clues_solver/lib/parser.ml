@@ -588,6 +588,52 @@ let parse_clue ~speaker ~clue ~all_names : constraint_expr list =
     end
   with _ -> ());
   
+  (* Pattern: "Only one/N row(s)/column(s) has/have exactly M innocents/criminals" *)
+  (* e.g. "Only one row has exactly 3 innocents" *)
+  (* This means exactly one row satisfies the count condition *)
+  let only_n_regions_with = Re.Pcre.regexp ~flags:[`CASELESS]
+    "only\\s+(one|two|three|\\d+)\\s+(rows?|columns?)\\s+(?:has|have)\\s+(?:exactly\\s+)?(\\d+|one|two|three|four|five|zero|no)\\s+(criminals?|innocents?)" in
+  (try
+    let g = Re.exec only_n_regions_with clue_lower in
+    let num_regions_str = Re.Group.get g 1 in
+    let region_type = Re.Group.get g 2 in
+    let count_str = Re.Group.get g 3 in
+    let target_str = Re.Group.get g 4 in
+    let num_regions = Option.value ~default:1 (parse_number_word num_regions_str) in
+    let count = Option.value ~default:0 (parse_number_word count_str) in
+    let target = if String.sub target_str 0 1 = "i" then Innocents else Criminals in
+    let is_row = String.length region_type >= 3 && String.sub region_type 0 3 = "row" in
+    (* Generate: exactly num_regions of the rows/columns have exactly count target *)
+    (* We express this as: the sum of (1 if region has count else 0) = num_regions *)
+    (* Using Or/And combinations for "exactly one" case *)
+    if num_regions = 1 then begin
+      if is_row then begin
+        let all_rows = [R1; R2; R3; R4; R5] in
+        (* At least one row has exactly count *)
+        add (Or (List.map (fun r -> Count (Row r, target, Eq count)) all_rows));
+        (* No two rows both have exactly count *)
+        List.iteri (fun i r1 ->
+          List.iteri (fun j r2 ->
+            if j > i then
+              add (Not (And [Count (Row r1, target, Eq count); Count (Row r2, target, Eq count)]))
+          ) all_rows
+        ) all_rows
+      end else begin
+        let all_cols = [A; B; C; D] in
+        (* At least one column has exactly count *)
+        add (Or (List.map (fun c -> Count (Column c, target, Eq count)) all_cols));
+        (* No two columns both have exactly count *)
+        List.iteri (fun i c1 ->
+          List.iteri (fun j c2 ->
+            if j > i then
+              add (Not (And [Count (Column c1, target, Eq count); Count (Column c2, target, Eq count)]))
+          ) all_cols
+        ) all_cols
+      end
+    end
+    (* TODO: handle num_regions > 1 if needed *)
+  with _ -> ());
+  
   (* Pattern: "X and Y share an odd/even number of innocent/criminal neighbors" *)
   let share_neighbors = Re.Pcre.regexp ~flags:[`CASELESS]
     "(\\w+)\\s+and\\s+(\\w+)\\s+share\\s+(?:an?\\s+)?(odd|even)\\s+number\\s+of\\s+(innocent|criminal)\\s+neighbors?" in
@@ -637,6 +683,7 @@ let parse_clue ~speaker ~clue ~all_names : constraint_expr list =
   
   (* Pattern: "Exactly N of X's M innocent/criminal neighbors also neighbor Y" *)
   (* e.g. "Exactly 2 of Peter's 3 innocent neighbors also neighbor Oscar" *)
+  (* Also handles "me" as Y *)
   let neighbors_also_neighbor = Re.Pcre.regexp ~flags:[`CASELESS]
     "exactly\\s+(\\d+|one|two|three|four|five|six|seven|eight)\\s+of\\s+(\\w+)'s\\s+(\\d+|one|two|three|four|five|six|seven|eight)\\s+(innocent|criminal)\\s+neighbors?\\s+also\\s+neighbors?\\s+(\\w+)" in
   (try
@@ -645,7 +692,9 @@ let parse_clue ~speaker ~clue ~all_names : constraint_expr list =
     let name1 = Re.Group.get g 2 in
     let total_count_str = Re.Group.get g 3 in
     let target_str = String.lowercase_ascii (Re.Group.get g 4) in
-    let name2 = Re.Group.get g 5 in
+    let name2_raw = Re.Group.get g 5 in
+    (* Handle "me" by substituting with speaker *)
+    let name2 = if String.lowercase_ascii name2_raw = "me" then speaker else name2_raw in
     if List.mem name1 all_names && List.mem name2 all_names then begin
       let shared_count = Option.value ~default:0 (parse_number_word shared_count_str) in
       let total_count = Option.value ~default:0 (parse_number_word total_count_str) in
@@ -685,6 +734,61 @@ let parse_clue ~speaker ~clue ~all_names : constraint_expr list =
       add (PersonCount (person1, neighbor_target, Eq total_count));
       (* region_count of person1's innocent/criminal neighbors are in region relative to person2 *)
       add (RegionNeighborCount (region, target, person1, Eq region_count))
+    end
+  with _ -> ());
+  
+  (* Pattern: "Only/Exactly N of the M innocents/criminals neighboring X is/are Y's neighbor(s)" *)
+  (* e.g. "Only 1 of the 4 innocents neighboring Hope is David's neighbor" *)
+  let innocents_neighboring_is_neighbor = Re.Pcre.regexp ~flags:[`CASELESS]
+    "(?:only|exactly)\\s+(\\d+|one|two|three|four|five|six|seven|eight)\\s+of\\s+(?:the\\s+)?(\\d+|one|two|three|four|five|six|seven|eight)\\s+(innocents?|criminals?)\\s+neighboring\\s+(\\w+)\\s+(?:is|are)\\s+(\\w+)'s\\s+neighbors?" in
+  (try
+    let g = Re.exec innocents_neighboring_is_neighbor clue in
+    let shared_count_str = Re.Group.get g 1 in
+    let total_count_str = Re.Group.get g 2 in
+    let target_str = String.lowercase_ascii (Re.Group.get g 3) in
+    let name1 = Re.Group.get g 4 in
+    let name2 = Re.Group.get g 5 in
+    if List.mem name1 all_names && List.mem name2 all_names then begin
+      let shared_count = Option.value ~default:0 (parse_number_word shared_count_str) in
+      let total_count = Option.value ~default:0 (parse_number_word total_count_str) in
+      let target = if String.sub target_str 0 1 = "i" then Innocents else Criminals in
+      let neighbor_target = if String.sub target_str 0 1 = "i" then InnocentNeighbors else CriminalNeighbors in
+      (* name1 has total_count innocent/criminal neighbors *)
+      add (PersonCount (name1, neighbor_target, Eq total_count));
+      (* shared_count of the innocents/criminals in (name2's neighbors ∩ name1's neighbors) *)
+      add (RegionNeighborCount (Neighbors name2, target, name1, Eq shared_count))
+    end
+  with _ -> ());
+  
+  (* Pattern: "Only/Exactly N of the M innocents/criminals neighboring X is/are in [region]" *)
+  (* e.g. "Only 1 of the 4 innocents neighboring Olive is in row 5" *)
+  let innocents_neighboring_in_region = Re.Pcre.regexp ~flags:[`CASELESS]
+    "(?:only|exactly)\\s+(\\d+|one|two|three|four|five|six|seven|eight)\\s+of\\s+(?:the\\s+)?(\\d+|one|two|three|four|five|six|seven|eight)\\s+(innocents?|criminals?)\\s+neighboring\\s+(\\w+)\\s+(?:is|are)\\s+(?:in|on)\\s+(?:the\\s+)?(row\\s+\\d|column\\s+[A-Da-d]|edges?|corners?)" in
+  (try
+    let g = Re.exec innocents_neighboring_in_region clue in
+    let region_count_str = Re.Group.get g 1 in
+    let total_count_str = Re.Group.get g 2 in
+    let target_str = String.lowercase_ascii (Re.Group.get g 3) in
+    let name = Re.Group.get g 4 in
+    let region_str = String.lowercase_ascii (Re.Group.get g 5) in
+    if List.mem name all_names then begin
+      let region_count = Option.value ~default:0 (parse_number_word region_count_str) in
+      let total_count = Option.value ~default:0 (parse_number_word total_count_str) in
+      let target = if String.sub target_str 0 1 = "i" then Innocents else Criminals in
+      let neighbor_target = if String.sub target_str 0 1 = "i" then InnocentNeighbors else CriminalNeighbors in
+      let region = 
+        if String.length region_str >= 3 && String.sub region_str 0 3 = "row" then
+          match parse_row region_str with Some r -> Row r | None -> failwith "bad row"
+        else if String.length region_str >= 3 && String.sub region_str 0 3 = "col" then
+          match parse_column region_str with Some c -> Column c | None -> failwith "bad col"
+        else if String.length region_str >= 4 && String.sub region_str 0 4 = "edge" then Edges
+        else if String.length region_str >= 4 && String.sub region_str 0 4 = "corn" then Corners
+        else failwith "unknown region"
+      in
+      (* name has total_count innocent/criminal neighbors *)
+      add (PersonCount (name, neighbor_target, Eq total_count));
+      (* region_count of name's innocent/criminal neighbors are in region *)
+      add (RegionNeighborCount (region, target, name, Eq region_count))
     end
   with _ -> ());
   
@@ -781,6 +885,38 @@ let parse_clue ~speaker ~clue ~all_names : constraint_expr list =
     "(\\d+|one|two|three|four|five)\\s+(?:out\\s+)?of\\s+(\\d+|one|two|three|four|five)\\s+(\\w+)\\s+have\\s+(?:a|an)\\s+(criminal|innocent)\\s+directly\\s+(below|above|to\\s+the\\s+left\\s+of|to\\s+the\\s+right\\s+of)\\s+them" in
   (try
     let g = Re.exec profession_directly_adjacent clue_lower in
+    let satisfy_count_str = Re.Group.get g 1 in
+    let total_count_str = Re.Group.get g 2 in
+    let profession = Re.Group.get g 3 in
+    let target_str = Re.Group.get g 4 in
+    let direction_str = Re.Group.get g 5 in
+    let satisfy_count = Option.value ~default:0 (parse_number_word satisfy_count_str) in
+    let total_count = Option.value ~default:0 (parse_number_word total_count_str) in
+    let target = if target_str = "innocent" then Innocents else Criminals in
+    let direction = 
+      if String.length direction_str >= 5 && String.sub direction_str 0 5 = "below" then DirBelow
+      else if String.length direction_str >= 5 && String.sub direction_str 0 5 = "above" then DirAbove
+      else if String.length direction_str > 10 && String.sub direction_str 0 11 = "to the left" then DirLeft
+      else DirRight
+    in
+    (* Remove trailing 's' from profession if plural (coders -> coder) *)
+    let profession_singular = 
+      let len = String.length profession in
+      if len > 1 && profession.[len-1] = 's' then String.sub profession 0 (len - 1)
+      else profession
+    in
+    (* There are M people with this profession *)
+    add (Count (Profession profession_singular, Everyone, Eq total_count));
+    (* N of them have the target directly adjacent *)
+    add (CountPeopleWithDirectlyAdjacent (Profession profession_singular, target, direction, Eq satisfy_count))
+  with _ -> ());
+  
+  (* Pattern: "Exactly N of us M [profession] has/have a criminal/innocent directly [direction] of them" *)
+  (* e.g. "Exactly 1 of us 3 builders has an innocent directly to the left of them" *)
+  let us_profession_directly_adjacent = Re.Pcre.regexp ~flags:[`CASELESS]
+    "exactly\\s+(\\d+|one|two|three|four|five)\\s+of\\s+us\\s+(\\d+|one|two|three|four|five)\\s+(\\w+)\\s+(?:has|have)\\s+(?:a|an)\\s+(criminal|innocent)\\s+directly\\s+(below|above|to\\s+the\\s+left\\s+of|to\\s+the\\s+right\\s+of)\\s+them" in
+  (try
+    let g = Re.exec us_profession_directly_adjacent clue_lower in
     let satisfy_count_str = Re.Group.get g 1 in
     let total_count_str = Re.Group.get g 2 in
     let profession = Re.Group.get g 3 in

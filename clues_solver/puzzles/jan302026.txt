@@ -1,20 +1,20 @@
 A1, Austin, singer, NO DESCRIPTION YET
-A2, Erwin, painter, NO DESCRIPTION YET
+A2, Erwin, painter, 2 out of 3 coders have a criminal directly below them
 A3, Jerry, cop, NO DESCRIPTION YET
-A4, Nancy, farmer, NO DESCRIPTION YET
+A4, Nancy, farmer, Only 1 of the 2 innocents in row 1 is Chloe's neighbor
 A5, Salil, clerk, NO DESCRIPTION YET
 B1, Bobby, coder, NO DESCRIPTION YET
-B2, Gabe, coder, NO DESCRIPTION YET
+B2, Gabe, coder, There is only one innocent to the left of Wanda
 B3, Kyle, painter, NO DESCRIPTION YET
-B4, Olive, painter, NO DESCRIPTION YET
+B4, Olive, painter, Exactly 2 of the 4 innocents neighboring Jerry are above Salil
 B5, Uma, doctor, NO DESCRIPTION YET
-C1, Chloe, clerk, NO DESCRIPTION YET
-C2, Hope, builder, NO DESCRIPTION YET
-C3, Laura, builder, NO DESCRIPTION YET
+C1, Chloe, clerk, There are more innocents in row 1 than row 5
+C2, Hope, builder, Exactly 2 of Laura's 4 innocent neighbors also neighbor me
+C3, Laura, builder, Only 1 of the 4 innocents neighboring Olive is in row 5
 C4, Paula, farmer, NO DESCRIPTION YET
-C5, Wanda, doctor, NO DESCRIPTION YET
+C5, Wanda, doctor, Only one row has exactly 3 innocents
 D1, David, coder, NO DESCRIPTION YET
-D2, Ike, builder, NO DESCRIPTION YET
-D3, Maria, singer, NO DESCRIPTION YET
+D2, Ike, builder, Exactly 1 of us 3 builders has an innocent directly to the left of them
+D3, Maria, singer, Only 1 of the 4 innocents neighboring Hope is David's neighbor
 D4, Ruby, doctor, NO DESCRIPTION YET
-D5, Xavi, cop, NO DESCRIPTION YET
+D5, Xavi, cop, There's an equal number of criminals in rows 2 and 5
