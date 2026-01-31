@@ -1,6 +1,6 @@
 A1, Austin, singer, NO DESCRIPTION YET
 A2, Erwin, painter, 2 out of 3 coders have a criminal directly below them
-A3, Jerry, cop, NO DESCRIPTION YET
+A3, Jerry, cop, Each column has at least 2 innocents
 A4, Nancy, farmer, Only 1 of the 2 innocents in row 1 is Chloe's neighbor
 A5, Salil, clerk, NO DESCRIPTION YET
 B1, Bobby, coder, NO DESCRIPTION YET

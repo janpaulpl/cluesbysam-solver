@@ -634,6 +634,32 @@ let parse_clue ~speaker ~clue ~all_names : constraint_expr list =
     (* TODO: handle num_regions > 1 if needed *)
   with _ -> ());
   
+  (* Pattern: "Each/Every row/column has at least/exactly/at most N innocents/criminals" *)
+  (* e.g. "Each column has at least 2 innocents" *)
+  let each_region_has = Re.Pcre.regexp ~flags:[`CASELESS]
+    "(?:each|every)\\s+(row|column)\\s+has\\s+(at\\s+least|at\\s+most|exactly)\\s+(\\d+|one|two|three|four|five|zero|no)\\s+(criminals?|innocents?)" in
+  (try
+    let g = Re.exec each_region_has clue_lower in
+    let region_type = Re.Group.get g 1 in
+    let comparison_str = Re.Group.get g 2 in
+    let count_str = Re.Group.get g 3 in
+    let target_str = Re.Group.get g 4 in
+    let count = Option.value ~default:0 (parse_number_word count_str) in
+    let target = if String.sub target_str 0 1 = "i" then Innocents else Criminals in
+    let comparison = 
+      if String.length comparison_str >= 8 && String.sub comparison_str 0 8 = "at least" then Gte count
+      else if String.length comparison_str >= 7 && String.sub comparison_str 0 7 = "at most" then Lte count
+      else Eq count
+    in
+    if region_type = "row" then begin
+      let all_rows = [R1; R2; R3; R4; R5] in
+      List.iter (fun r -> add (Count (Row r, target, comparison))) all_rows
+    end else begin
+      let all_cols = [A; B; C; D] in
+      List.iter (fun c -> add (Count (Column c, target, comparison))) all_cols
+    end
+  with _ -> ());
+  
   (* Pattern: "X and Y share an odd/even number of innocent/criminal neighbors" *)
   let share_neighbors = Re.Pcre.regexp ~flags:[`CASELESS]
     "(\\w+)\\s+and\\s+(\\w+)\\s+share\\s+(?:an?\\s+)?(odd|even)\\s+number\\s+of\\s+(innocent|criminal)\\s+neighbors?" in
