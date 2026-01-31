@@ -658,6 +658,36 @@ let parse_clue ~speaker ~clue ~all_names : constraint_expr list =
     end
   with _ -> ());
   
+  (* Pattern: "Exactly N of the M innocents/criminals neighboring X are above/below/left of/right of Y" *)
+  (* e.g. "Exactly 2 of the 4 innocents neighboring Jerry are above Salil" *)
+  let neighbors_relative_position = Re.Pcre.regexp ~flags:[`CASELESS]
+    "exactly\\s+(\\d+|one|two|three|four|five|six|seven|eight)\\s+of\\s+(?:the\\s+)?(\\d+|one|two|three|four|five|six|seven|eight)\\s+(innocents?|criminals?)\\s+neighboring\\s+(\\w+)\\s+(?:is|are)\\s+(above|below|to\\s+the\\s+left\\s+of|to\\s+the\\s+right\\s+of)\\s+(\\w+)" in
+  (try
+    let g = Re.exec neighbors_relative_position clue in
+    let region_count_str = Re.Group.get g 1 in
+    let total_count_str = Re.Group.get g 2 in
+    let target_str = String.lowercase_ascii (Re.Group.get g 3) in
+    let person1 = Re.Group.get g 4 in
+    let direction = String.lowercase_ascii (Re.Group.get g 5) in
+    let person2 = Re.Group.get g 6 in
+    if List.mem person1 all_names && List.mem person2 all_names then begin
+      let region_count = Option.value ~default:0 (parse_number_word region_count_str) in
+      let total_count = Option.value ~default:0 (parse_number_word total_count_str) in
+      let target = if String.sub target_str 0 1 = "i" then Innocents else Criminals in
+      let neighbor_target = if String.sub target_str 0 1 = "i" then InnocentNeighbors else CriminalNeighbors in
+      let region = 
+        if String.length direction >= 5 && String.sub direction 0 5 = "above" then Above person2
+        else if String.length direction >= 5 && String.sub direction 0 5 = "below" then Below person2
+        else if String.length direction > 10 && String.sub direction 0 11 = "to the left" then LeftOf person2
+        else RightOf person2
+      in
+      (* person1 has total_count innocent/criminal neighbors *)
+      add (PersonCount (person1, neighbor_target, Eq total_count));
+      (* region_count of person1's innocent/criminal neighbors are in region relative to person2 *)
+      add (RegionNeighborCount (region, target, person1, Eq region_count))
+    end
+  with _ -> ());
+  
   (* Pattern: "Only/Exactly N of the M innocents/criminals in [region] is/are X's neighbor(s)" *)
   (* e.g. "Only 1 of the 2 innocents in column B is Laura's neighbor" *)
   (* Also handles: "on the edges", "on the corners", "in row N" *)
